@@ -1,0 +1,18 @@
+topic: aegis.dim.lanes
+owner: aegis-data-team
+freshness_sla_s: 300
+checks:
+  schema:
+    required: [id, origin, destination]
+    types:
+      distance_km: float
+      otif_pct: int
+      volume: int
+  enums: {}
+  ranges:
+    distance_km: [0, 50000]
+    otif_pct: [0, 100]
+    volume: [0, 1000000]
+  freshness:
+    max_lag_s: 900
+on_violation: flag

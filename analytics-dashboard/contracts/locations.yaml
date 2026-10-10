@@ -1,0 +1,19 @@
+topic: aegis.dim.locations
+owner: aegis-data-team
+freshness_sla_s: 300
+checks:
+  schema:
+    required: [id, name, kind]
+    types:
+      lat: float
+      lng: float
+      stock_level: float
+  enums:
+    kind: [hq, dc, csc, port, airport, city, hub]
+  ranges:
+    lat: [-90, 90]
+    lng: [-180, 180]
+    stock_level: [0, 100]
+  freshness:
+    max_lag_s: 900
+on_violation: flag

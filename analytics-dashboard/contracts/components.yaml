@@ -1,0 +1,26 @@
+topic: aegis.dim.components
+owner: aegis-analystics
+freshness_sla_s: 3600
+on_violation: quarantine
+checks:
+  schema:
+    required: [vehicle_id, name, health, wear, rul_days, status, next_service]
+    types:
+      vehicle_id: str
+      name: str
+      photo: str
+      wear: int
+      health: int
+      km: int
+      status: str
+      rul_days: int
+      est_cost: int
+  enums:
+    status: [ok, warning, critical]
+    photo: [engine, gearbox, valve, suspension, exhaust, cooling, ecg, brake, cab, fuel, prop, radar, tyre]
+  ranges:
+    health: [0, 100]
+    wear: [0, 100]
+    rul_days: [0, 3650]
+    est_cost: [0, 1000000]
+    km: [0, 1000000]

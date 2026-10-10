@@ -1,0 +1,22 @@
+connector.name=hive
+hive.metastore=hive
+hive.metastore.uri=
+# data op MinIO (S3-compatible), base-path zonder trailing slash
+hive.fs.default-scheme=s3
+hive.object-storage.type=S3
+hive.object-storage.s3.endpoint=http://minio:9000
+hive.object-storage.s3.access-key=minioadmin
+hive.object-storage.s3.secret-key=Password123!
+hive.object-storage.s3.region=us-east-1
+hive.object-storage.s3.path-style-access=true
+hive.object-storage.s3.aws-endpoint=http://minio:9000
+hive.data-writer.bucketing-column-count=0
+hive.non-managed-table.enabled=true
+hive.storage-format=PARQUET
+hive.allow-raw-table-access=true
+hive.allow-file-delimited-table-access=true
+hive.allow-raw-partitioning=false
+# base directory
+hive.config.resource-dir=/etc/trino/hive
+hive.hdfs.configuration-resource-dir=/etc/trino/hive
+hive.object-storage.default-bucket=aegis-lake

@@ -1,0 +1,18 @@
+topic: aegis.dim.drivers
+owner: aegis-data-team
+freshness_sla_s: 600
+checks:
+  schema:
+    required: [vehicle_id, full_name]
+    types:
+      years_exp: int
+      rating: float
+      trips: int
+  enums: {}
+  ranges:
+    years_exp: [0, 60]
+    rating: [0, 5]
+    trips: [0, 1000000]
+  freshness:
+    max_lag_s: 1800
+on_violation: flag

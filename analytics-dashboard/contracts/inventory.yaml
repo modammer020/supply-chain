@@ -1,0 +1,18 @@
+topic: aegis.dim.inventory
+owner: aegis-data-team
+freshness_sla_s: 300
+checks:
+  schema:
+    required: [hub_id, sku, stock]
+    types:
+      stock: int
+      reorder: int
+      velocity: float
+  enums: {}
+  ranges:
+    stock: [0, 10000000]
+    reorder: [0, 10000000]
+    velocity: [0, 10000000]
+  freshness:
+    max_lag_s: 900
+on_violation: flag

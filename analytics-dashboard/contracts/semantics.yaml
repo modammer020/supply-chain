@@ -1,0 +1,102 @@
+# Semantic definitions per KPI/measure (context layer — FR-007)
+# Derived from api.py /api/kpi + data-model.md §6
+otif_pct:
+  label: "OTIF %"
+  definition: "On-time-in-full percentage across all lanes (average)"
+  source_table: lanes
+  world: it
+  formula: "AVG(lanes.otif_pct)"
+value_in_transit:
+  label: "Value in transit"
+  definition: "Total value of shipments in transit"
+  source_table: shipments
+  world: it
+  formula: "SUM(value_eur) WHERE status='in_transit'"
+active_shipments:
+  label: "Active shipments"
+  definition: "Number of shipments in transit"
+  source_table: shipments
+  world: it
+  formula: "COUNT(*) WHERE status='in_transit'"
+delayed:
+  label: "Delayed / rerouted"
+  definition: "Shipments with status delayed or rerouted"
+  source_table: shipments
+  world: it
+  formula: "COUNT(*) WHERE status IN ('delayed','rerouted')"
+incidents:
+  label: "Open incidents"
+  definition: "Unresolved incidents"
+  source_table: incidents
+  world: it
+  formula: "COUNT(*) WHERE resolved_at IS NULL"
+carbon_tco2:
+  label: "Carbon (tCO2)"
+  definition: "Total CO2 emissions of the fleet"
+  source_table: vehicles
+  world: it
+  formula: "SUM(carbon_tco2)"
+low_stock_skus:
+  label: "Low-stock SKUs"
+  definition: "SKUs below reorder point"
+  source_table: inventory
+  world: it
+  formula: "COUNT(*) WHERE stock < reorder"
+weekly_demand_units:
+  label: "Weekly demand"
+  definition: "Estimated weekly demand (units)"
+  source_table: inventory
+  world: it
+  formula: "SUM(velocity)"
+units:
+  label: "Units"
+  definition: "Total units in the fleet"
+  source_table: vehicles
+  world: it
+  formula: "COUNT(*)"
+fleet_fuel_avg:
+  unit: "%"
+  label: "Fleet fuel avg"
+  definition: "Average fuel level across the whole fleet (OT condition)"
+  source_table: vehicles
+  world: ot
+  formula: "AVG(vehicles.fuel_pct)"
+fleet_speed_avg:
+  unit: "km/h"
+  label: "Fleet speed avg"
+  definition: "Average speed of moving vehicles (24h telemetry)"
+  source_table: telemetry
+  world: ot
+  formula: "AVG(speed_kmh) WHERE speed_kmh > 0"
+live_vehicles_10m:
+  unit: ""
+  label: "Live vehicles"
+  definition: "Vehicles with telemetry in the last 10 minutes"
+  source_table: telemetry
+  world: ot
+  formula: "COUNT(DISTINCT vehicle_id) WHERE ts > now()-10m"
+incidents_p1:
+  unit: ""
+  label: "Open incidents P1"
+  definition: "Unresolved P1 incidents (highest priority)"
+  source_table: incidents
+  world: it
+  formula: "COUNT(*) WHERE resolved_at IS NULL AND severity='P1'"
+cargo_temp:
+  label: "Cargo temperature"
+  definition: "Cargo temperature per vehicle (telemetry)"
+  source_table: telemetry
+  world: ot
+  formula: "AVG/MAX(cargo_temp) per vehicle"
+telemetry_count:
+  label: "Telemetry events"
+  definition: "Number of telemetry events per period (pipeline heartbeat)"
+  source_table: telemetry
+  world: it
+  formula: "COUNT(*) per bucket"
+shipment_status:
+  label: "Shipment status"
+  definition: "Distribution of shipments by status (dimension snapshot)"
+  source_table: shipments
+  world: it
+  formula: "COUNT(*) GROUP BY status per bucket"

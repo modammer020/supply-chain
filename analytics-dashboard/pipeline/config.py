@@ -1,0 +1,6 @@
+"""Gedeelde pipeline-config (reuse van captor/config)."""
+from captor.config import (  # noqa: F401
+    TABLES, KAFKA_BOOTSTRAP, MINIO_ENDPOINT, MINIO_ENDPOINT_BARE,
+    MINIO_ACCESS_KEY, MINIO_SECRET_KEY,
+    DATA_PATH, CATALOG_HOST, CATALOG_PORT, CATALOG_DB, CATALOG_USER, CATALOG_PASSWORD,
+)

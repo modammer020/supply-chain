@@ -1,0 +1,16 @@
+topic: aegis.events.shipment
+owner: aegis-data-team
+freshness_sla_s: 3600
+checks:
+  schema:
+    required: [id, shipment_id, ts, type]
+    types:
+      ts: ts
+      shipment_id: str
+      type: str
+  enums:
+    type: [dep, chk, loaded, departed, staged, sla, arr, inc, cust, status, delay, reloc]
+  ranges: {}
+  freshness:
+    max_lag_s: 86400
+on_violation: flag

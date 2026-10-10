@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AEGIS Analytics Platform — Architectuur (Spec 002)</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#050b1a; --panel:#0a1226; --grid:#12203a;
+    --cyan:#22d3ee; --green:#34d399; --violet:#a78bfa; --orange:#fb923c;
+    --rose:#fb7185; --amber:#fbbf24; --magenta:#f472b6; --slate:#94a3b8;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg); color:#e2e8f0;
+    font-family:'JetBrains Mono', monospace;
+    padding:28px 32px 40px;
+  }
+  header{display:flex; align-items:center; gap:14px; margin-bottom:6px;}
+  .pulse-dot{width:10px;height:10px;border-radius:50%;background:var(--cyan);
+    box-shadow:0 0 12px var(--cyan); animation:pulse 1.6s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.75)}}
+  h1{font-family:'Rajdhani',sans-serif;font-size:30px;font-weight:700;letter-spacing:3px;
+     color:#fff; text-shadow:0 0 18px rgba(34,211,238,.55);}
+  h1 span{color:var(--cyan);}
+  .sub{color:var(--slate); font-size:12px; letter-spacing:1px; margin-bottom:20px;}
+  .sub b{color:var(--amber); font-weight:600;}
+
+  .frame{border:1px solid #1e3a5f; border-radius:14px; padding:18px;
+    background:
+      radial-gradient(1200px 500px at 20% 0%, rgba(34,211,238,.06), transparent 60%),
+      radial-gradient(1000px 500px at 85% 100%, rgba(167,139,250,.07), transparent 60%),
+      var(--bg);
+    box-shadow:0 0 40px rgba(34,211,238,.08), inset 0 0 80px rgba(2,8,23,.9);
+    overflow-x:auto;}
+  svg{display:block; margin:0 auto; max-width:1720px;}
+
+  /* ---------- node hover: neon glow ---------- */
+  .node{cursor:pointer;}
+  .node .glow{transition:all .28s ease;}
+  .node:hover .glow{
+    filter:drop-shadow(0 0 9px var(--nc)) drop-shadow(0 0 22px var(--nc));
+  }
+  .node:hover .shell{stroke:var(--nc); stroke-width:2.2;}
+  .node:hover .name{fill:#fff;}
+
+  .zone-title{font-family:'Rajdhani',sans-serif; font-size:15px; font-weight:700;
+    letter-spacing:2.5px; fill:var(--tc); }
+  .name{font-family:'JetBrains Mono',monospace; font-size:12.5px; font-weight:600; fill:#e8f2ff;}
+  .sub2{font-family:'JetBrains Mono',monospace; font-size:9px; fill:#7d92b5;}
+  .tiny{font-family:'JetBrains Mono',monospace; font-size:8px; fill:#5b7096;}
+  .elabel{font-family:'JetBrains Mono',monospace; font-size:8.5px; fill:#8fb3d9; letter-spacing:.4px;}
+  .badge{font-family:'JetBrains Mono',monospace; font-size:8px; fill:var(--amber); font-weight:600;}
+
+  /* ---------- flows ---------- */
+  .flow{stroke-dasharray:10 7; animation:dashmove 1.1s linear infinite;}
+  @keyframes dashmove{to{stroke-dashoffset:-17;}}
+  .flow-slow{stroke-dasharray:4 6; animation:dashmove 2.2s linear infinite;}
+  .edash{stroke-dasharray:5 4; opacity:.8;}
+  .metrics{stroke-dasharray:3 4; opacity:.55;}
+  .console-line{stroke-dasharray:2 4; opacity:.4;}
+
+  /* legend + cards */
+  .legend{font-size:9.5px; fill:#8fb3d9; font-family:'JetBrains Mono',monospace;}
+  .cards{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:20px;}
+  .card{border:1px solid #1e3a5f; border-radius:12px; padding:16px 18px; background:rgba(10,18,38,.7);}
+  .card h3{font-family:'Rajdhani',sans-serif; font-size:16px; letter-spacing:1.5px;
+    display:flex; align-items:center; gap:9px; margin-bottom:10px; color:#fff;}
+  .dot{width:8px;height:8px;border-radius:50%;}
+  .card ul{list-style:none;}
+  .card li{font-size:10.5px; color:#9db4d4; padding:3.5px 0; line-height:1.45;}
+  .card li b{color:#e8f2ff; font-weight:600;}
+  .footer{margin-top:18px; font-size:10px; color:#5b7096; letter-spacing:1px;}
+  @media (max-width:1100px){.cards{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="pulse-dot"></div>
+  <h1>AEGIS ANALYTICS PLATFORM <span>// ARCHITECTURE</span></h1>
+</header>
+<div class="sub">SPEC 002 · read-only spiegel van <b>aegis_db</b> → Kafka → Spark (+data contracts) → <b>DuckLake</b> → DuckDB + Trino → dashboard · hover een node voor neon-glow</div>
+
+<div class="frame">
+<svg width="1720" height="1060" viewBox="0 0 1720 1060" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#12203a" stroke-width="0.6"/>
+    </pattern>
+    <marker id="arr-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#22d3ee"/></marker>
+    <marker id="arr-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#34d399"/></marker>
+    <marker id="arr-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#fb923c"/></marker>
+    <marker id="arr-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#a78bfa"/></marker>
+    <marker id="arr-rose" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#fb7185"/></marker>
+    <marker id="arr-slate" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/></marker>
+    <marker id="arr-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#fbbf24"/></marker>
+  </defs>
+
+  <rect width="1720" height="1060" fill="url(#grid)"/>
+
+  <!-- ══════════ EDGES (drawn first: behind nodes) ══════════ -->
+
+  <!-- AEGIS → captor (read-only poll) -->
+  <path d="M 390 170 L 520 175" class="edash" stroke="#34d399" stroke-width="1.6" fill="none" marker-end="url(#arr-green)"/>
+  <text x="404" y="158" class="elabel">read-only poll · 30s + manual</text>
+
+  <!-- captor → kafka -->
+  <path d="M 680 175 L 740 175" class="flow" stroke="#fb923c" stroke-width="2" fill="none" marker-end="url(#arr-orange)"/>
+  <!-- kafka → spark -->
+  <path d="M 820 210 L 820 290" class="flow" stroke="#fb923c" stroke-width="2" fill="none" marker-end="url(#arr-orange)"/>
+  <text x="830" y="252" class="elabel">aegis.events.* · aegis.dim.*</text>
+
+  <!-- contracts → spark -->
+  <path d="M 1000 210 C 960 250, 900 260, 856 288" class="edash" stroke="#fbbf24" stroke-width="1.6" fill="none" marker-end="url(#arr-amber)"/>
+  <text x="930" y="238" class="elabel">contract-checks (YAML)</text>
+
+  <!-- spark → minio -->
+  <path d="M 900 330 L 980 330" class="flow" stroke="#a78bfa" stroke-width="2.2" fill="none" marker-end="url(#arr-violet)"/>
+  <text x="902" y="318" class="elabel">DuckLake append</text>
+
+  <!-- spark → quarantine -->
+  <path d="M 820 370 L 820 450" class="edash" stroke="#fb7185" stroke-width="1.5" fill="none" marker-end="url(#arr-rose)"/>
+  <text x="830" y="415" class="elabel">violations</text>
+
+  <!-- spark → lake-catalog (metadata commits) -->
+  <path d="M 860 370 C 930 405, 990 425, 1040 448" class="edash" stroke="#a78bfa" stroke-width="1.4" fill="none" marker-end="url(#arr-violet)"/>
+  <text x="880" y="428" class="elabel">catalog commits</text>
+
+  <!-- minio ↔ lake-catalog -->
+  <path d="M 1065 370 L 1065 450" stroke="#a78bfa" stroke-width="1.2" fill="none" opacity=".6"/>
+  <text x="1075" y="412" class="elabel">data ⇄ metadata</text>
+
+  <!-- minio → dashboard (DuckDB native) -->
+  <path d="M 1130 370 C 1205 430, 1205 520, 1080 578" class="flow" stroke="#22d3ee" stroke-width="2" fill="none" marker-end="url(#arr-cyan)"/>
+  <text x="1160" y="470" class="elabel">DuckDB → DuckLake</text>
+
+  <!-- lake-catalog → dashboard (provenance) -->
+  <path d="M 1030 510 L 1030 578" class="edash" stroke="#a78bfa" stroke-width="1.4" fill="none" marker-end="url(#arr-violet)"/>
+  <text x="1040" y="548" class="elabel">provenance / snapshots</text>
+
+  <!-- trino → dashboard -->
+  <path d="M 600 510 L 600 578" class="flow" stroke="#22d3ee" stroke-width="2" fill="none" marker-end="url(#arr-cyan)"/>
+  <text x="610" y="548" class="elabel">federated live + historie</text>
+
+  <!-- minio → trino (parquet) -->
+  <path d="M 980 360 C 870 400, 720 430, 640 468" class="flow" stroke="#a78bfa" stroke-width="1.8" fill="none" marker-end="url(#arr-violet)"/>
+  <text x="740" y="418" class="elabel">parquet (hive-connector)</text>
+
+  <!-- aegis_db → trino (live) -->
+  <path d="M 330 210 C 330 380, 400 480, 518 480" class="flow" stroke="#34d399" stroke-width="1.8" fill="none" marker-end="url(#arr-green)"/>
+  <text x="300" y="350" class="elabel">live federated</text>
+  <text x="300" y="362" class="elabel">(postgres-connector)</text>
+
+  <!-- observability metrics -->
+  <path d="M 650 720 L 650 800" class="metrics" stroke="#94a3b8" stroke-width="1.3" fill="none" marker-end="url(#arr-slate)"/>
+  <path d="M 820 720 L 820 800" class="metrics" stroke="#94a3b8" stroke-width="1.3" fill="none" marker-end="url(#arr-slate)"/>
+  <path d="M 1065 720 L 1065 758 L 880 758 L 880 800" class="metrics" stroke="#94a3b8" stroke-width="1.3" fill="none" marker-end="url(#arr-slate)"/>
+  <text x="660" y="748" class="elabel">prometheus scrape 15s</text>
+  <path d="M 690 830 L 760 830" stroke="#94a3b8" stroke-width="1.4" fill="none" marker-end="url(#arr-slate)"/>
+
+  <!-- pulsing data dots on the main pipeline -->
+  <circle r="4.5" fill="#fb923c"><animateMotion dur="2.2s" repeatCount="indefinite" path="M 680 175 L 740 175 L 820 175 L 820 290"/></circle>
+  <circle r="4.5" fill="#a78bfa"><animateMotion dur="2.6s" repeatCount="indefinite" path="M 900 330 L 980 330 L 1065 330 L 1130 370 C 1205 430, 1205 520, 1080 578"/></circle>
+  <circle r="4" fill="#34d399"><animateMotion dur="3s" repeatCount="indefinite" path="M 390 170 L 520 175 L 600 175 L 680 175"/></circle>
+  <circle r="4" fill="#22d3ee"><animateMotion dur="2.4s" repeatCount="indefinite" path="M 600 510 L 600 578"/></circle>
+  <circle r="3.5" fill="#34d399"><animateMotion dur="3.4s" repeatCount="indefinite" path="M 330 210 C 330 380, 400 480, 518 480"/></circle>
+
+  <!-- console lines (rail → tools) -->
+  <path d="M 1345 157 H 1290 V 112 H 820 V 138" class="console-line" stroke="#fbbf24" stroke-width="1.2" fill="none" marker-end="url(#arr-amber)"/>
+  <path d="M 1345 227 H 1290 V 385 H 902 V 335" class="console-line" stroke="#fbbf24" stroke-width="1.2" fill="none" marker-end="url(#arr-amber)"/>
+  <path d="M 1345 297 H 1290 V 545 H 680 V 485" class="console-line" stroke="#fbbf24" stroke-width="1.2" fill="none" marker-end="url(#arr-amber)"/>
+  <path d="M 1345 367 H 1290 V 330 H 1152" class="console-line" stroke="#fbbf24" stroke-width="1.2" fill="none" marker-end="url(#arr-amber)"/>
+  <path d="M 1345 437 H 1290 V 480 H 1152" class="console-line" stroke="#fbbf24" stroke-width="1.2" fill="none" marker-end="url(#arr-amber)"/>
+  <path d="M 1345 507 H 1290 V 830 H 932" class="console-line" stroke="#fbbf24" stroke-width="1.2" fill="none" marker-end="url(#arr-amber)"/>
+  <path d="M 1345 577 H 1272 V 880 H 690 V 835" class="console-line" stroke="#fbbf24" stroke-width="1.2" fill="none" marker-end="url(#arr-amber)"/>
+  <path d="M 1345 647 H 1152" class="console-line" stroke="#fbbf24" stroke-width="1.2" fill="none" marker-end="url(#arr-amber)"/>
+
+  <!-- ══════════ ZONE A: AEGIS COMMAND CENTER ══════════ -->
+  <rect x="40" y="80" width="380" height="340" rx="12" fill="rgba(251,191,36,0.04)" stroke="#fbbf24" stroke-width="1.4" stroke-dasharray="8 4"/>
+  <text x="60" y="112" class="zone-title" style="--tc:#fbbf24">AEGIS COMMAND CENTER</text>
+  <text x="60" y="128" class="tiny">spec 001 · bestaand · NIET gewijzigd</text>
+
+  <g class="node" style="--nc:#a78bfa">
+    <title>aegis_db · PostgreSQL 16 + PostGIS 3.4 · port 5433 — Single Source of Truth. 10 tabellen (shipments, telemetry, shipment_events, vehicles, lanes, locations, inventory, drivers, incidents, kv). Platform leest uitsluitend read-only.</title>
+    <rect class="glow" x="70" y="130" width="320" height="80" rx="6" fill="#0a1226"/>
+    <rect class="shell" x="70" y="130" width="320" height="80" rx="6" fill="rgba(76,29,149,0.35)" stroke="#a78bfa" stroke-width="1.5"/>
+    <path d="M 84 148 a 22 6 0 0 1 44 0 a 22 6 0 0 1 -44 0 M 84 148 v 14 a 22 6 0 0 0 44 0 v -14" fill="none" stroke="#a78bfa" stroke-width="1.3"/>
+    <text x="142" y="166" class="name">aegis_db</text>
+    <text x="142" y="182" class="sub2">PostGIS 16 · :5433 · SSOT</text>
+    <text x="142" y="196" class="sub2">read-only voor het platform</text>
+    <rect x="84" y="142" width="44" height="26" fill="none" stroke="#a78bfa" opacity="0"/>
+  </g>
+
+  <g class="node" style="--nc:#34d399">
+    <title>FastAPI api.py · port 8300 — bestaande AEGIS-API. Blijft ongewijzigd; het platform is een onafhankelijke spiegel.</title>
+    <rect class="glow" x="70" y="260" width="150" height="70" rx="6" fill="#0a1226"/>
+    <rect class="shell" x="70" y="260" width="150" height="70" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+    <text x="86" y="288" class="name">FastAPI</text>
+    <text x="86" y="304" class="sub2">api.py · :8300</text>
+    <text x="86" y="318" class="sub2">/api/kpi · /api/insights</text>
+  </g>
+
+  <g class="node" style="--nc:#22d3ee">
+    <title>Command center UI · port 8765 — bestaande single-file frontend (Leaflet map). Ondertussen onafhankelijk van het analytics-platform.</title>
+    <rect class="glow" x="240" y="260" width="150" height="70" rx="6" fill="#0a1226"/>
+    <rect class="shell" x="240" y="260" width="150" height="70" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+    <text x="256" y="288" class="name">CC UI</text>
+    <text x="256" y="304" class="sub2">:8765 · Leaflet map</text>
+    <text x="256" y="318" class="sub2">live telemetry</text>
+  </g>
+
+  <!-- ══════════ ZONE B: ANALYTICS PLATFORM ══════════ -->
+  <rect x="480" y="80" width="760" height="640" rx="12" fill="rgba(34,211,238,0.03)" stroke="#22d3ee" stroke-width="1.4" stroke-dasharray="8 4"/>
+  <text x="500" y="115" class="zone-title">AEGIS ANALYTICS PLATFORM (SPEC 002)</text>
+  <text x="500" y="131" class="tiny">apart podman-compose project · 12 services</text>
+
+  <g class="node" style="--nc:#34d399">
+    <title>Captor · FastAPI :8400 — poller op 30s + POST /manual/poll (409 bij clash). Watermarks persistent, idempotent, full-bootstrap bij eerste start. Read-only op aegis_db.</title>
+    <rect class="glow" x="520" y="140" width="160" height="70" rx="6" fill="#0a1226"/>
+    <rect class="shell" x="520" y="140" width="160" height="70" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+    <text x="536" y="168" class="name">Captor</text>
+    <text x="536" y="184" class="sub2">poll 30s + manual · :8400</text>
+    <text x="536" y="198" class="sub2">bootstrap · watermarks</text>
+  </g>
+
+  <g class="node" style="--nc:#fb923c">
+    <title>Kafka KRaft · 1 broker · retention 7d — topics: aegis.events.{shipment,telemetry}, aegis.dim.{shipments,vehicles,lanes,locations,inventory,drivers}, aegis.metrics, aegis.quarantine. Tevens audit-trail (provenance).</title>
+    <rect class="glow" x="740" y="140" width="160" height="70" rx="6" fill="#0a1226"/>
+    <rect class="shell" x="740" y="140" width="160" height="70" rx="6" fill="rgba(251,146,60,0.28)" stroke="#fb923c" stroke-width="1.5"/>
+    <text x="756" y="168" class="name">Kafka</text>
+    <text x="756" y="184" class="sub2">KRaft · 10 topics</text>
+    <text x="756" y="198" class="sub2">retention 7d · audit-trail</text>
+  </g>
+
+  <g class="node" style="--nc:#94a3b8">
+    <title>Data Contracts (YAML per topic) — schema, enum's, ranges, freshness-SLA. Wordt geëngineerd IN DE PIPELINE (Spark), niet in documentatie. Gartner-kern: contract in de pipeline = guardrail.</title>
+    <rect class="glow" x="980" y="140" width="170" height="70" rx="6" fill="#0a1226"/>
+    <rect class="shell" x="980" y="140" width="170" height="70" rx="6" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+    <text x="996" y="168" class="name">Data Contracts</text>
+    <text x="996" y="184" class="sub2">YAML · schema · enum · range</text>
+    <text x="996" y="198" class="sub2">freshness-SLA · enforce</text>
+  </g>
+
+  <g class="node" style="--nc:#34d399">
+    <title>Spark structured streaming · local mode — micro-batches per 30s; contract-enforcement; dedup; schrijft facts/dims naar DuckLake (ducklake-spark V2 connector). Fallback: plain parquet.</title>
+    <rect class="glow" x="740" y="290" width="160" height="80" rx="6" fill="#0a1226"/>
+    <rect class="shell" x="740" y="290" width="160" height="80" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+    <text x="756" y="320" class="name">Spark</text>
+    <text x="756" y="336" class="sub2">structured streaming</text>
+    <text x="756" y="350" class="sub2">contract enforce · dedup</text>
+    <text x="756" y="364" class="sub2">→ ducklake-spark writer</text>
+  </g>
+
+  <g class="node" style="--nc:#a78bfa">
+    <title>MinIO · DuckLake v1.0 — Parquet op S3; data in DuckLake-tabelen (facts partitioned per dag, dims snapshots, 90d retention). DuckLake v1.0 = GA (2026-04), MIT, production-ready.</title>
+    <rect class="glow" x="980" y="290" width="170" height="80" rx="6" fill="#0a1226"/>
+    <rect class="shell" x="980" y="290" width="170" height="80" rx="6" fill="rgba(76,29,149,0.35)" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="996" y="320" class="name">MinIO</text>
+    <text x="996" y="336" class="sub2">DuckLake v1.0 lakehouse</text>
+    <text x="996" y="350" class="sub2">Parquet on S3 · :9000</text>
+    <text x="996" y="364" class="sub2">facts + dims · 90d</text>
+  </g>
+
+  <g class="node" style="--nc:#a78bfa">
+    <title>lake-catalog · Postgres 16 — DuckLake metadata-catalog (snapshots, schema, file-statistics, quarantaine). Eigen container, los van aegis_db. Biedt time-travel + provenance aan het dashboard.</title>
+    <rect class="glow" x="980" y="450" width="170" height="60" rx="6" fill="#0a1226"/>
+    <rect class="shell" x="980" y="450" width="170" height="60" rx="6" fill="rgba(76,29,149,0.35)" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="996" y="478" class="name">lake-catalog</text>
+    <text x="996" y="494" class="sub2">Postgres 16 · DuckLake meta</text>
+    <text x="996" y="506" class="tiny">snapshots · quarantaine</text>
+  </g>
+
+  <g class="node" style="--nc:#fb7185">
+    <title>Quarantaine — contract-overtredingen (enum/range/freshness/schema). Niet in facts/dims; auditbaar via /api/quality/quarantine + Grafana-metrik.</title>
+    <rect class="glow" x="740" y="450" width="160" height="60" rx="6" fill="#0a1226"/>
+    <rect class="shell" x="740" y="450" width="160" height="60" rx="6" fill="rgba(136,19,55,0.4)" stroke="#fb7185" stroke-width="1.5"/>
+    <text x="756" y="478" class="name">Quarantine</text>
+    <text x="756" y="494" class="sub2">contract violations</text>
+    <text x="756" y="506" class="tiny">audit + /api/quality</text>
+  </g>
+
+  <g class="node" style="--nc:#34d399">
+    <title>Trino 48x — federated SQL: postgres-connector (live aegis_db) + hive-connector (parquet uit MinIO). "Live + historie in één query" (FR-006). Web UI :8543.</title>
+    <rect class="glow" x="520" y="450" width="160" height="60" rx="6" fill="#0a1226"/>
+    <rect class="shell" x="520" y="450" width="160" height="60" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+    <text x="536" y="478" class="name">Trino 48x</text>
+    <text x="536" y="494" class="sub2">federated SQL · :8543</text>
+    <text x="536" y="506" class="tiny">live + lake in 1 query</text>
+  </g>
+
+  <g class="node" style="--nc:#22d3ee">
+    <title>Analytics Dashboard — eigen frontend :8402 + FastAPI :8401 met embedded DuckDB → DuckLake. KPI-kaarten + trends; per kaart: bron, semantische definitie, data-leeftijd, contract-status (FR-007/008). Stale-badging bij uitval (FR-011).</title>
+    <rect class="glow" x="520" y="580" width="630" height="120" rx="8" fill="#0a1226"/>
+    <rect class="shell" x="520" y="580" width="630" height="120" rx="8" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.8"/>
+    <text x="544" y="612" class="name" style="font-size:15px; font-family:'Rajdhani'; font-weight:700; letter-spacing:2px;">ANALYTICS DASHBOARD</text>
+    <text x="544" y="632" class="sub2">frontend :8402 · API :8401 · Chart.js · AEGIS control-room theme</text>
+    <rect x="544" y="648" width="240" height="38" rx="5" fill="rgba(34,211,238,0.12)" stroke="#22d3ee" stroke-width="1"/>
+    <text x="558" y="665" class="sub2" fill="#7dd3fc">DuckDB embedded → DuckLake</text>
+    <text x="558" y="679" class="tiny">trends · aggregaties · snapshots</text>
+    <rect x="800" y="648" width="180" height="38" rx="5" fill="rgba(167,139,250,0.12)" stroke="#a78bfa" stroke-width="1"/>
+    <text x="814" y="665" class="sub2" fill="#c4b5fd">semantiek + freshness</text>
+    <text x="814" y="679" class="tiny">per KPI-kaart · contract-badge</text>
+    <rect x="996" y="648" width="136" height="38" rx="5" fill="rgba(52,211,153,0.12)" stroke="#34d399" stroke-width="1"/>
+    <text x="1010" y="665" class="sub2" fill="#6ee7b7">provenance-click</text>
+    <text x="1010" y="679" class="tiny">→ bron in &lt;10 min</text>
+  </g>
+
+  <!-- ══════════ ZONE C: OBSERVABILITY ══════════ -->
+  <rect x="480" y="770" width="760" height="120" rx="12" fill="rgba(167,139,250,0.04)" stroke="#a78bfa" stroke-width="1.4" stroke-dasharray="8 4"/>
+  <text x="500" y="798" class="zone-title" style="--tc:#a78bfa; font-size:13px;">DATA OBSERVABILITY</text>
+
+  <g class="node" style="--nc:#94a3b8">
+    <title>Prometheus :9090 — scrape 15s: captor_cycles, captor_errors, kafka lag, contract_failures, last_event_timestamp. Bron voor Grafana + /api/status.</title>
+    <rect class="glow" x="520" y="805" width="170" height="60" rx="6" fill="#0a1226"/>
+    <rect class="shell" x="520" y="805" width="170" height="60" rx="6" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+    <text x="536" y="832" class="name">Prometheus</text>
+    <text x="536" y="848" class="sub2">scrape 15s · :9090</text>
+  </g>
+
+  <g class="node" style="--nc:#a78bfa">
+    <title>Grafana :3000 — pipeline-dashboard: Kafka-lag, contract-failures, captor-cycles, laatste event-ts per topic, spark-job runs. Login admin/admin.</title>
+    <rect class="glow" x="760" y="805" width="170" height="60" rx="6" fill="#0a1226"/>
+    <rect class="shell" x="760" y="805" width="170" height="60" rx="6" fill="rgba(124,58,237,0.3)" stroke="#a78bfa" stroke-width="1.5"/>
+    <text x="776" y="832" class="name">Grafana</text>
+    <text x="776" y="848" class="sub2">pipeline-health · :3000</text>
+  </g>
+
+  <!-- ══════════ CONSOLE RAIL: ACCESS LAYER ══════════ -->
+  <rect x="1320" y="80" width="360" height="810" rx="12" fill="rgba(251,191,36,0.03)" stroke="#fbbf24" stroke-width="1.4" stroke-dasharray="8 4"/>
+  <text x="1340" y="112" class="zone-title" style="--tc:#fbbf24; font-size:14px;">ACCESS LAYER — INLOGGEN</text>
+  <text x="1340" y="128" class="tiny">FR-012 · elke tool met eigen console</text>
+
+  <g class="node" style="--nc:#fbbf24"><title>Kafka UI (Provectus) — browse topics, consumer groups, record-bekijk. :8040 · geen login.</title>
+    <rect class="glow" x="1345" y="130" width="310" height="54" rx="6" fill="#0a1226"/>
+    <rect class="shell" x="1345" y="130" width="310" height="54" rx="6" fill="rgba(251,191,36,0.1)" stroke="#fbbf24" stroke-width="1.3"/>
+    <text x="1362" y="155" class="name" font-size="11.5px">⬢ Kafka UI</text>
+    <text x="1362" y="171" class="sub2">:8040 · topics + records</text>
+    <text x="1590" y="166" class="badge">geen login</text>
+  </g>
+  <g class="node" style="--nc:#fbbf24"><title>JupyterLab — notebooks met pyspark- en duckdb-kernels: explorair analyseren van de lake, contract-tests draaien, Spark direct bedienen. :8888.</title>
+    <rect class="glow" x="1345" y="200" width="310" height="54" rx="6" fill="#0a1226"/>
+    <rect class="shell" x="1345" y="200" width="310" height="54" rx="6" fill="rgba(251,191,36,0.1)" stroke="#fbbf24" stroke-width="1.3"/>
+    <text x="1362" y="225" class="name" font-size="11.5px">⬢ JupyterLab</text>
+    <text x="1362" y="241" class="sub2">:8888 · pyspark + duckdb kernels</text>
+    <text x="1560" y="236" class="badge">token</text>
+  </g>
+  <g class="node" style="--nc:#fbbf24"><title>Trino Web UI — federated SQL direct typen: live aegis_db JOIN lake-parquet. :8543 · lokaal, geen login.</title>
+    <rect class="glow" x="1345" y="270" width="310" height="54" rx="6" fill="#0a1226"/>
+    <rect class="shell" x="1345" y="270" width="310" height="54" rx="6" fill="rgba(251,191,36,0.1)" stroke="#fbbf24" stroke-width="1.3"/>
+    <text x="1362" y="295" class="name" font-size="11.5px">⬢ Trino UI</text>
+    <text x="1362" y="311" class="sub2">:8543 · federated SQL console</text>
+    <text x="1560" y="306" class="badge">geen login</text>
+  </g>
+  <g class="node" style="--nc:#fbbf24"><title>MinIO Console — bucket aegis-lake, parquets bestanden, S3 API. :9001 · minioadmin / (env).</title>
+    <rect class="glow" x="1345" y="340" width="310" height="54" rx="6" fill="#0a1226"/>
+    <rect class="shell" x="1345" y="340" width="310" height="54" rx="6" fill="rgba(251,191,36,0.1)" stroke="#fbbf24" stroke-width="1.3"/>
+    <text x="1362" y="365" class="name" font-size="11.5px">⬢ MinIO Console</text>
+    <text x="1362" y="381" class="sub2">:9001 · S3 + parquets</text>
+    <text x="1520" y="376" class="badge">minioadmin</text>
+  </g>
+  <g class="node" style="--nc:#fbbf24"><title>Adminer — beide SQL-databases: aegis_db (read-only bron) + lake-catalog (DuckLake-metadata &amp; quarantaine). :8081 · login per DB.</title>
+    <rect class="glow" x="1345" y="410" width="310" height="54" rx="6" fill="#0a1226"/>
+    <rect class="shell" x="1345" y="410" width="310" height="54" rx="6" fill="rgba(251,191,36,0.1)" stroke="#fbbf24" stroke-width="1.3"/>
+    <text x="1362" y="435" class="name" font-size="11.5px">⬢ Adminer</text>
+    <text x="1362" y="451" class="sub2">:8081 · aegis_db + lake-catalog</text>
+    <text x="1555" y="446" class="badge">per DB</text>
+  </g>
+  <g class="node" style="--nc:#fbbf24"><title>Grafana — pipeline-dashboard (Kafka-lag, contract-failures, captor-cycles, event-ts). :3000 · admin / admin.</title>
+    <rect class="glow" x="1345" y="480" width="310" height="54" rx="6" fill="#0a1226"/>
+    <rect class="shell" x="1345" y="480" width="310" height="54" rx="6" fill="rgba(251,191,36,0.1)" stroke="#fbbf24" stroke-width="1.3"/>
+    <text x="1362" y="505" class="name" font-size="11.5px">⬢ Grafana</text>
+    <text x="1362" y="521" class="sub2">:3000 · pipeline-health</text>
+    <text x="1540" y="516" class="badge">admin</text>
+  </g>
+  <g class="node" style="--nc:#fbbf24"><title>Prometheus — raw metrics, PromQL console. :9090 · geen login.</title>
+    <rect class="glow" x="1345" y="550" width="310" height="54" rx="6" fill="#0a1226"/>
+    <rect class="shell" x="1345" y="550" width="310" height="54" rx="6" fill="rgba(251,191,36,0.1)" stroke="#fbbf24" stroke-width="1.3"/>
+    <text x="1362" y="575" class="name" font-size="11.5px">⬢ Prometheus</text>
+    <text x="1362" y="591" class="sub2">:9090 · PromQL</text>
+    <text x="1590" y="586" class="badge">geen login</text>
+  </g>
+  <g class="node" style="--nc:#fbbf24"><title>Analytics Dashboard + Captor API — het eindproduct (KPI's, trends, semantiek) + /health &amp; POST /manual/poll op :8400. :8401/:8402.</title>
+    <rect class="glow" x="1345" y="620" width="310" height="54" rx="6" fill="#0a1226"/>
+    <rect class="shell" x="1345" y="620" width="310" height="54" rx="6" fill="rgba(251,191,36,0.14)" stroke="#fbbf24" stroke-width="1.6"/>
+    <text x="1362" y="645" class="name" font-size="11.5px">⬢ Dashboard + Captor</text>
+    <text x="1362" y="661" class="sub2">:8402 · :8401 · :8400</text>
+    <text x="1580" y="656" class="badge">eindproduct</text>
+  </g>
+
+  <!-- ══════════ LEGEND ══════════ -->
+  <text x="40" y="940" class="legend" font-size="12" fill="#e8f2ff">LEGENDA</text>
+  <line x1="40" y1="965" x2="110" y2="965" class="flow" stroke="#fb923c" stroke-width="2"/>
+  <text x="120" y="969" class="legend">event flow (pulsend)</text>
+  <line x1="300" y1="965" x2="370" y2="965" class="edash" stroke="#fbbf24" stroke-width="1.6"/>
+  <text x="380" y="969" class="legend">checks / read-only</text>
+  <line x1="560" y1="965" x2="630" y2="965" class="metrics" stroke="#94a3b8" stroke-width="1.3"/>
+  <text x="640" y="969" class="legend">metrics scrape</text>
+  <line x1="800" y1="965" x2="870" y2="965" class="console-line" stroke="#fbbf24" stroke-width="1.2"/>
+  <text x="880" y="969" class="legend">console-login (FR-012)</text>
+  <circle cx="1080" cy="965" r="4" fill="#fb923c"/>
+  <text x="1092" y="969" class="legend">gepulseerde data-dot</text>
+
+  <rect x="40" y="990" width="14" height="14" rx="3" fill="rgba(76,29,149,0.35)" stroke="#a78bfa"/>
+  <text x="62" y="1002" class="legend">database / lake</text>
+  <rect x="200" y="990" width="14" height="14" rx="3" fill="rgba(6,78,59,0.4)" stroke="#34d399"/>
+  <text x="222" y="1002" class="legend">service / engine</text>
+  <rect x="360" y="990" width="14" height="14" rx="3" fill="rgba(8,51,68,0.4)" stroke="#22d3ee"/>
+  <text x="382" y="1002" class="legend">frontend / query-reader</text>
+  <rect x="570" y="990" width="14" height="14" rx="3" fill="rgba(251,146,60,0.28)" stroke="#fb923c"/>
+  <text x="592" y="1002" class="legend">message bus</text>
+  <rect x="720" y="990" width="14" height="14" rx="3" fill="rgba(136,19,55,0.4)" stroke="#fb7185"/>
+  <text x="742" y="1002" class="legend">quarantaine / risk</text>
+  <rect x="890" y="990" width="14" height="14" rx="3" fill="rgba(30,41,59,0.5)" stroke="#94a3b8"/>
+  <text x="912" y="1002" class="legend">config / metrics</text>
+
+  <text x="40" y="1035" class="tiny">HOVER ELKE NODE → NEON GLOW + TOOLTIP (context, porten, login) · lijnen pulsen in de richting van de dataflow</text>
+</svg>
+</div>
+
+<div class="cards">
+  <div class="card">
+    <h3><div class="dot" style="background:#fb923c; box-shadow:0 0 8px #fb923c"></div>DATAFLOW (PULSEND)</h3>
+    <ul>
+      <li>• <b>aegis_db → Captor</b>: read-only poll elke 30s + handmatige trigger; full-bootstrap bij eerste start; idempotent via watermarks</li>
+      <li>• <b>Captor → Kafka</b>: 10 topics (2 events, 6 dims, metrics, quarantaine) — de audit-trail van elke data-movement</li>
+      <li>• <b>Spark</b>: micro-batches per 30s, contract-enforcement, dedup → <b>DuckLake</b> in MinIO</li>
+      <li>• <b>DuckDB</b> leest native (trends), <b>Trino</b> federated (live + historie in één query)</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3><div class="dot" style="background:#a78bfa; box-shadow:0 0 8px #a78bfa"></div>CONTEXT LAYER (GARTNER)</h3>
+    <ul>
+      <li>• <b>Semantiek</b>: elke KPI-kaart draagt een mens-leesbare definitie (semantics.yaml)</li>
+      <li>• <b>Freshness</b>: data-leeftijd per kaart + SLA per topic (rood/geel/groen)</li>
+      <li>• <b>Provenance</b>: Kafka-trail + DuckLake snapshots + lineage-click → bron in &lt; 10 min</li>
+      <li>• <b>Enforcement</b>: data contracts in de pipeline (niet in de wiki) — overtredingen → quarantaine</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3><div class="dot" style="background:#fbbf24; box-shadow:0 0 8px #fbbf24"></div>CONSOLES &amp; LOGINS</h3>
+    <ul>
+      <li>• Kafka UI <b>:8040</b> · JupyterLab <b>:8888</b> (pyspark + duckdb) · Trino UI <b>:8543</b></li>
+      <li>• MinIO Console <b>:9001</b> (minioadmin) · Adminer <b>:8081</b> (aegis_db + lake-catalog)</li>
+      <li>• Grafana <b>:3000</b> (admin/admin) · Prometheus <b>:9090</b></li>
+      <li>• Dashboard <b>:8402</b> · API <b>:8401</b> · Captor <b>:8400</b> (/health, POST /manual/poll)</li>
+    </ul>
+  </div>
+</div>
+
+<div class="footer">AEGIS ANALYTICS PLATFORM · SPEC 002 · 2026-10-09 · podman-compose · 12 services · read-only spiegel van aegis_db</div>
+</body>
+</html>

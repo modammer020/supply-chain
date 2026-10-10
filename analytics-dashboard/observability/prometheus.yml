@@ -1,0 +1,17 @@
+# AEGIS Analytics — pipeline observability
+# Default-login: Password123! (Grafana admin/admin → hier: admin / Password123!)
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: captor
+    static_configs:
+      - targets: ["captor:8400"]
+
+  - job_name: pipeline
+    static_configs:
+      - targets: ["pipeline:8410"]
+
+  - job_name: dashboard
+    static_configs:
+      - targets: ["dashboard:8401"]

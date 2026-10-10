@@ -1,0 +1,80 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 0,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] } } },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [ { "expr": "captor_errors_total", "legendFormat": "errors {{table}}" } ],
+      "title": "Captor errors per tabel",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] } } },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [ { "expr": "sum(increase(captor_rows_captured_total[1h])) by (table)", "legendFormat": "{{table}}" } ],
+      "title": "Rows gevangen per tabel (1u)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } } },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [ { "expr": "sum(increase(pipeline_quarantine_total[24h])) by (table)", "legendFormat": "{{table}}" } ],
+      "title": "Contract-overtredingen (24u)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 300 } ] } } },
+      "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] } },
+      "targets": [ { "expr": "time() - captor_last_cycle_timestamp_s", "legendFormat": "{{table}}" } ],
+      "title": "Data-leeftijd per tabel (s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "options": { "colorMode": "none", "graphMode": "area", "reduceOptions": { "calcs": [] } },
+      "targets": [ { "expr": "increase(pipeline_records_in_total[5m]) by (table)", "legendFormat": "{{table}} in" } ],
+      "title": "Records in (per 5m)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "options": { "colorMode": "none", "graphMode": "area", "reduceOptions": { "calcs": [] } },
+      "targets": [ { "expr": "increase(captor_rows_captured_total[5m]) by (table)", "legendFormat": "{{table}}" } ],
+      "title": "Captor rows per 5m",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 }
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "options": { "colorMode": "none", "graphMode": "area", "reduceOptions": { "calcs": [] } },
+      "targets": [ { "expr": "increase(pipeline_records_written_total[5m]) by (table)", "legendFormat": "{{table}} naar lake" } ],
+      "title": "Records naar lake (per 5m)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 }
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["aegis", "analytics", "pipeline"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timezone": "",
+  "title": "AEGIS Analytics — Pipeline Health",
+  "uid": "aegis-analytics-pipeline",
+  "version": 1
+}

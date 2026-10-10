@@ -1,0 +1,22 @@
+topic: aegis.dim.shipments
+owner: aegis-data-team
+freshness_sla_s: 120
+checks:
+  schema:
+    required: [id, status, lane_id, vehicle_id, created_at]
+    types:
+      status: str
+      eta_minutes: int
+      sla_minutes: int
+      value_eur: float
+      progress: float
+  enums:
+    status: [loading, in_transit, delayed, rerouted, delivered, cancelled, planned]
+  ranges:
+    eta_minutes: [0, 100000]
+    sla_minutes: [0, 100000]
+    value_eur: [0, 1000000000]
+    progress: [0, 1.5]
+  freshness:
+    max_lag_s: 900
+on_violation: quarantine

@@ -1,0 +1,19 @@
+topic: aegis.dim.vehicles
+owner: aegis-data-team
+freshness_sla_s: 300
+checks:
+  schema:
+    required: [id, kind, fuel_pct]
+    types:
+      fuel_pct: float
+      capacity_t: float
+      load_t: float
+  enums:
+    kind: [truck, ship, plane]
+  ranges:
+    fuel_pct: [0, 100]
+    capacity_t: [0, 1000]
+    load_t: [0, 1000]
+  freshness:
+    max_lag_s: 900
+on_violation: flag

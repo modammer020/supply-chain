@@ -1,0 +1,143 @@
+# Component catalog (demo catalog, deterministic generated data)
+# Part-number formula: PART-{KIND}-{SEQ} · SEQ = sequence per type.
+# Used by the recommendation engine (FR-104) and vehicle dossiers (FR-105).
+# Labels: all prices/lead times are DEMO values (source: SIM catalog).
+
+catalog:
+  part_number_format: "PART-{kind}-{seq:03d}"
+  currency: EUR
+  disclaimer: "Demo catalog: specifications, prices and lead times are generated sample data."
+
+# Per component type (based on `photo` + name pattern from dims.components)
+parts:
+  - id: PRT-ENG-001
+    part_number: PART-ENG-001
+    name: "Turbine engine CFM56-7B (low bypass)"
+    matches: ["Engine #1 (CFM)", "Engine #2 (CFM)", "Engine", "Main engine"]
+    kind: engine
+    supplier: "CFM International (demo)"
+    lead_time_days: 45
+    price_eur: 54900
+    specs:
+      type: "Low-bypass turbofan"
+      thrust_kN: 135
+      bypass_ratio: "5.0:1"
+      fuel_flow_kgh: 812
+      life_hours: 30000
+      tsa_cycles: 4800
+      maintenance: "HSM-check every 12,000 h; HPC-inspection every 18,000 h"
+      cert: "EASA-Part21 / demo"
+
+  - id: PRT-HYD-001
+    part_number: PART-HYD-001
+    name: "Hydraulic pump set (270 bar)"
+    matches: ["Hydraulics"]
+    kind: hydraulic
+    supplier: "HydraSys (demo)"
+    lead_time_days: 21
+    price_eur: 18400
+    specs:
+      type: "Axial piston pump, twin"
+      pressure_bar: 270
+      flow_lmin: 68
+      fluid: "MIL-PRF-5606 (synthetic)"
+      seal: "PTFE, chemically resistant"
+      maintenance: "Pump replacement every 8,000 h or on pressure drop >8%"
+
+  - id: PRT-AXL-001
+    part_number: PART-AXL-001
+    name: "Propeller drive / shaft (stainless)"
+    matches: ["Propeller / shaft"]
+    kind: drivetrain
+    supplier: "DriveWorks (demo)"
+    lead_time_days: 30
+    price_eur: 22750
+    specs:
+      type: "Cardan shaft with flexible coupling"
+      diameter_mm: 110
+      torque_kNm: 45
+      material: "17-4PH stainless"
+      balance_grade: "G6.3 (ISO 21940)"
+      maintenance: "Shaft inspection + balancing every 10,000 h"
+
+  - id: PRT-SUS-001
+    part_number: PART-SUS-001
+    name: "Air suspension / spring system (airbag)"
+    matches: ["Suspension / airbag", "Landing gear"]
+    kind: suspension
+    supplier: "AirRide Components (demo)"
+    lead_time_days: 14
+    price_eur: 9800
+    specs:
+      type: "Pneumatic spring-pressure unit"
+      load_t: 12
+      stroke_mm: 320
+      pressure_bar: 8.5
+      bladder: "Nitrile, triple-wrapped"
+      maintenance: "Air-pressure check weekly; bladder replacement every 40,000 km"
+
+  - id: PRT-ELE-001
+    part_number: PART-ELE-001
+    name: "ECU / control electronics (IP67)"
+    matches: ["Electrical / ECU", "Avionics / FMS"]
+    kind: electronic
+    supplier: "AutoLogic (demo)"
+    lead_time_days: 10
+    price_eur: 7600
+    specs:
+      type: "Autonomous control-electronics unit"
+      supply: "24V DC / 12A"
+      io: "CAN-FD x2, Ethernet AV, 16x DI/DO"
+      ip_rating: "IP67 / MIL-STD-461"
+      software: "ISO 26262 ASIL-D (demo)"
+      maintenance: "Firmware update + calibration every 18,000 h"
+
+  - id: PRT-COO-001
+    part_number: PART-COO-001
+    name: "Cooling system / radiator (aluminium)"
+    matches: ["Cooling / radiator", "Refrigeration", "Anti-ice / pitot"]
+    kind: cooling
+    supplier: "ThermoCore (demo)"
+    lead_time_days: 12
+    price_eur: 6200
+    specs:
+      type: "Aluminium core with plastic tank"
+      capacity_l: 14
+      flow_lmin: 22
+      cooling_kw: 88
+      material: "Alu6061 / polyethylene"
+      maintenance: "Dry-run check + coolant replacement every 30,000 km"
+
+  - id: PRT-EXH-001
+    part_number: PART-EXH-001
+    name: "Exhaust / tailpipe system (titanium)"
+    matches: ["Exhaust / AdBlue", "APU"]
+    kind: exhaust
+    supplier: "TitanFlow (demo)"
+    lead_time_days: 18
+    price_eur: 11300
+    specs:
+      type: "Titanium tailpipe with aftercooler"
+      material: "Titanium Gr.5"
+      temp_max_c: 950
+      backpressure_kPa: 14
+      noise_db: 82
+      maintenance: "Emissions check + corrosion inspection every 12,000 h"
+
+  - id: PRT-VAL-001
+    part_number: PART-VAL-001
+    name: "Steering / control valve (hydraulic)"
+    matches: ["Flight controls", "Brake system", "Ballast system", "Bow thruster",
+              "Navigation / GPS", "Crane / hatch", "Cab / body", "Tyres (8x)",
+              "Fuel system", "Transmission"]
+    kind: valve
+    supplier: "PrecisionMotion (demo)"
+    lead_time_days: 8
+    price_eur: 5400
+    specs:
+      type: "Hydraulically actuated control valve"
+      stroke_mm: 40
+      force_kN: 12
+      response_ms: 250
+      position: "Magnetic amplifier, 0.5% linear"
+      maintenance: "Leak test + grease service every 6,000 h"

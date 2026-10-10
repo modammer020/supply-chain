@@ -1,0 +1,28 @@
+topic: aegis.events.telemetry
+owner: aegis-data-team
+freshness_sla_s: 120
+checks:
+  schema:
+    required: [vehicle_id, ts, lat, lng]
+    types:
+      lat: float
+      lng: float
+      fuel_pct: float
+      cargo_temp: float
+      speed_kmh: float
+      engine_temp: float
+      signal_pct: float
+      gps_acc_m: float
+  enums: {}
+  ranges:
+    lat: [-90, 90]
+    lng: [-180, 180]
+    fuel_pct: [0, 100]
+    speed_kmh: [0, 200]
+    cargo_temp: [-60, 100]
+    engine_temp: [0, 200]
+    signal_pct: [0, 100]
+    gps_acc_m: [0, 10000]
+  freshness:
+    max_lag_s: 300
+on_violation: quarantine

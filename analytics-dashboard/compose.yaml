@@ -1,0 +1,350 @@
+# AEGIS Analytics Platform — spec 002
+# 12 containers · read-only spiegel van aegis_db (aegis_default netwerk)
+# Default-login overal: Password123! (MinIO console, Grafana, Jupyter, Adminer, lake-catalog)
+
+x-defaults: &defaults
+  restart: unless-stopped
+  networks: [aegis_default]
+
+networks:
+  aegis_default:
+    external: true
+
+volumes:
+  kafka_data:
+  minio_data:
+  lake_catalog:
+  captor_state:
+  pipeline_state:
+  trino_data:
+  trino_config:
+  trino_plugins:
+  grafana_data:
+  jupyter_data:
+  ducklake_jar:
+  engineer_data:
+
+services:
+  # ── Message bus ──────────────────────────────────────────────
+  kafka:
+    <<: *defaults
+    image: apache/kafka:3.9.0
+    container_name: aegis_analytics_kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: controller,broker
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 15s
+      retries: 12
+      start_period: 45s
+
+  kafka-ui:
+    <<: *defaults
+    image: provectuslabs/kafka-ui:latest
+    container_name: aegis_analytics_kafka_ui
+    environment:
+      KAFKA_CLUSTERS_0_NAME: aegis
+      KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL: PLAINTEXT
+      DYNAMIC_CONFIG: "false"
+      ENABLE_LOG_AGENT: "false"
+    ports:
+      - "8040:8080"
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  # ── Topics init (Kafka auto-create staat uit) ───────────────
+  kafka-init:
+    image: apache/kafka:3.9.0
+    container_name: aegis_analytics_kafka_init
+    restart: "no"
+    command: ["/bin/bash", "/init/kafka_topics.sh"]
+    environment:
+      KAFKA_BOOTSTRAP: kafka:9092
+    volumes:
+      - ./init/kafka_topics.sh:/init/kafka_topics.sh:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+
+  # ── Object storage (DuckLake data path) ──────────────────────
+  minio:
+    <<: *defaults
+    image: minio/minio:latest
+    container_name: aegis_analytics_minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: "Password123!"
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # console (login: minioadmin / Password123!)
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:9000/minio/health/ready >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  minio-init:
+    <<: *defaults
+    image: minio/mc:latest
+    container_name: aegis_analytics_minio_init
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin 'Password123!' &&
+      mc mb -p local/aegis-lake &&
+      echo 'aegis-lake bucket ready'
+      "
+
+  # ── DuckLake catalog (Postgres) ──────────────────────────────
+  lake-catalog:
+    <<: *defaults
+    image: postgres:16
+    container_name: aegis_analytics_lake_catalog
+    environment:
+      POSTGRES_DB: lake
+      POSTGRES_USER: lake
+      POSTGRES_PASSWORD: "Password123!"
+    volumes:
+      - lake_catalog:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lake -d lake"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  lake-init:
+    <<: *defaults
+    build: .
+    container_name: aegis_analytics_lake_init
+    restart: "no"
+    command: python /app/init/init_lake.py
+    depends_on:
+      lake-catalog:
+        condition: service_healthy
+    environment:
+      CATALOG_HOST: lake-catalog
+      CATALOG_PORT: "5432"
+      CATALOG_DB: lake
+      CATALOG_USER: lake
+      CATALOG_PASSWORD: "Password123!"
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: "Password123!"
+      DATA_PATH: s3://aegis-lake/data/
+
+  # ── Federated query engine ───────────────────────────────────
+  trino:
+    <<: *defaults
+    image: trinodb/trino:481
+    container_name: aegis_analytics_trino
+    ports:
+      - "8543:8080"
+    volumes:
+      - ./trino/config:/etc/trino/config
+      - ./trino/catalog:/etc/trino/catalog
+      - trino_data:/var/trino/data
+      - trino_plugins:/usr/lib/trino/plugins
+      - ./parts:/app/parts:ro
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: "Password123!"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/v1/info >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 24
+      start_period: 40s
+    depends_on:
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      lake-catalog:
+        condition: service_healthy
+
+  # ── Captor (read-only poller aegis_db → Kafka) ───────────────
+  captor:
+    <<: *defaults
+    build: .
+    container_name: aegis_analytics_captor
+    command: python -m uvicorn captor.main:app --host 0.0.0.0 --port 8400
+    ports:
+      - "8400:8400"
+    environment: &pyenv
+      AEGIS_DB_HOST: aegis_db
+      AEGIS_DB_PORT: "5432"
+      AEGIS_DB_DB: aegis
+      AEGIS_DB_USER: aegis
+      AEGIS_DB_PASSWORD: aegis_dev
+      KAFKA_BOOTSTRAP: kafka:9092
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: "Password123!"
+      DATA_PATH: s3://aegis-lake/data/
+      CATALOG_HOST: lake-catalog
+      CATALOG_PORT: "5432"
+      CATALOG_DB: lake
+      CATALOG_USER: lake
+      CATALOG_PASSWORD: "Password123!"
+      POLL_INTERVAL_S: "30"
+    volumes:
+      - captor_state:/app/state
+    depends_on:
+      kafka:
+        condition: service_healthy
+      aegis_dep:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8400/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
+
+  # AEGIS-db presence dep (aegis_db leeft in een ander compose-project)
+  aegis_dep:
+    image: busybox:latest
+    container_name: aegis_analytics_aegis_dep
+    restart: "no"
+    command: >
+      sh -c "until nc -z -w2 aegis_db 5432; do sleep 2; done; echo aegis_db reachable"
+    networks: [aegis_default]
+
+  # ── Pipeline (Kafka → contracts → DuckLake) ─────────────────
+  pipeline:
+    <<: *defaults
+    build: .
+    container_name: aegis_analytics_pipeline
+    command: python -m pipeline.main
+    environment: *pyenv
+    volumes:
+      - pipeline_state:/app/state
+      - ducklake_jar:/opt/jars:ro
+    depends_on:
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      lake-catalog:
+        condition: service_healthy
+      lake-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -m 4 http://localhost:8410/healthz >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 8s
+      retries: 8
+      start_period: 45s
+
+  # ── Analytics dashboard (API :8401 + UI :8402) ──────────────
+  dashboard:
+    <<: *defaults
+    build: .
+    container_name: aegis_analytics_dashboard
+    command: python -m dashboard.main
+    ports:
+      - "8401:8401"
+      - "8402:8402"
+    environment: *pyenv
+    volumes:
+      - pipeline_state:/app/state:ro
+      - ./data/engineer:/app/data/engineer
+    depends_on:
+      trino:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      lake-catalog:
+        condition: service_healthy
+      lake-init:
+        condition: service_completed_successfully
+      pipeline:
+        condition: service_started
+
+  # ── Observability ────────────────────────────────────────────
+  prometheus:
+    <<: *defaults
+    image: prom/prometheus:latest
+    container_name: aegis_analytics_prometheus
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=7d"]
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  grafana:
+    <<: *defaults
+    image: grafana/grafana:latest
+    container_name: aegis_analytics_grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: "Password123!"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      prometheus:
+        condition: service_started
+
+  # ── Interactive console (Spark + DuckDB) ────────────────────
+  jupyter:
+    <<: *defaults
+    image: jupyter/base-notebook:latest
+    container_name: aegis_analytics_jupyter
+    ports:
+      - "8888:8888"
+    environment:
+      JUPYTER_TOKEN: "Password123!"
+      PIP_NO_CACHE_DIR: 1
+    volumes:
+      - jupyter_data:/home/jovyan/work
+      - ducklake_jar:/opt/jars/ducklake-spark:ro
+    command: >
+      bash -c "pip install --no-cache-dir pyspark==3.5.4 duckdb trino &&
+               jupyter lab --ip=0.0.0.0 --port=8888 --allow-root --no-browser"
+    depends_on:
+      trino:
+        condition: service_healthy
+
+  # ── SQL console (aegis_db + lake-catalog) ───────────────────
+  adminer:
+    <<: *defaults
+    image: adminer:latest
+    container_name: aegis_analytics_adminer
+    ports:
+      - "8081:8080"
+    environment:
+      ADMINER_DESIGN: elgato
+      ADMINER_SERVERS: >
+        {"aegis_db":{"host":"aegis_db","port":5432,"database":"aegis"},
+         "lake_catalog":{"host":"lake-catalog","port":5432,"database":"lake"}}
