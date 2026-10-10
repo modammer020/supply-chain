@@ -12,7 +12,7 @@ draaiend in plaats van op papier.
 ## Start
 
 ```bash
-cd /home/demouser/aegis-analytics
+cd analytics-dashboard   # of de map die je hier clone
 podman compose up -d --build
 podman compose ps          # wacht tot alle 12 Up (kafka + minio + trino first)
 ```
@@ -80,7 +80,7 @@ podman compose down -v       # + volumes (lake + watermarks + kafka) — WIJKT H
 ## Tests
 
 ```bash
-cd /home/demouser/aegis-analytics
+cd analytics-dashboard   # of de map die je hier clone
 .venv/bin/pytest captor/tests pipeline/tests -v   # op host (eigen venv)
 ```
 
