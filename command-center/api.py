@@ -1,5 +1,6 @@
 """AEGIS command-center API — PostGIS + OSRM routing + incident simulation."""
-import os, math, time, json, shutil, subprocess
+import os, math, time, json, shutil, subprocess, asyncio
+from datetime import datetime, timezone
 from typing import Optional
 import psycopg2
 import psycopg2.extras
@@ -562,6 +563,75 @@ def dell_network():
     }
 
 
+def _openverse_images(query: str, size: int = 4):
+    """Keyless CC image search (Openverse aggregates Flickr/Wikimedia/CC0).
+    Verifies each candidate URL server-side and keeps only ones that actually
+    serve image bytes (Wikimedia paths from Openverse are often stale/404)."""
+    url = "https://api.openverse.org/v1/images/"
+    r = _http_get_json(url, {"q": query, "page_size": size})
+    out = []
+    for it in r.get("results", []):
+        u = it.get("url")
+        if not u:
+            continue
+        probe = None
+        try:
+            p = httpx.get(u, timeout=15, headers={"User-Agent": "aegis-demo/1.0 (contact: demo)"})
+            ct = p.headers.get("content-type", "")
+            if p.status_code == 200 and (ct.startswith("image/") or len(p.content) > 8000):
+                probe = u
+        except Exception:
+            pass
+        if not probe:
+            continue
+        out.append({
+            "url": probe,
+            "thumbnail": it.get("thumbnail"),
+            "title": (it.get("title") or "")[:80],
+            "creator": it.get("creator") or "Unknown",
+            "creator_url": it.get("creator_url"),
+            "license": (it.get("license") or "CC") + (f" {it.get('license_version')}" if it.get("license_version") else ""),
+            "license_url": it.get("license_url"),
+            "provider": it.get("provider"),
+            "source_page": it.get("foreign_landing_url"),
+        })
+    return out
+
+@app.get("/api/dell-photo/{site_id}")
+def dell_photo(site_id: str):
+    """Representative, honest photo for a Dell network site.
+
+    Dell does not publish photos of its own offices, so we never claim one is.
+    We look up a Creative-Commons photo of the CITY (office building / skyline)
+    via Openverse (keyless, server-side), cache it 7 days, and always label it
+    as a representative city photo — never 'the Dell office'.
+    """
+    import re
+    with db() as c, c.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute("SELECT id,name,kind FROM locations WHERE id=%s AND kind IN ('hq','csc','factory')", (site_id,))
+        row = cur.fetchone()
+    if not row:
+        raise HTTPException(404, "site not found")
+    city = row["name"].split(" — ")[0].replace("Dell Factory — ", "").replace("Dell HQ — ", "").split(",")[0].strip()
+
+    def fetcher():
+        for q in (f"{city} skyline", f"{city} city", f"office building {city}"):
+            try:
+                hits = _openverse_images(q, 10)
+            except Exception:
+                continue
+            if hits:
+                return {"city": city, "query": q, "images": hits[:3],
+                        "note": f"Representative {city} photo — Dell does not publish photos of its offices."}
+        return None
+    d, state = _kv_cached(f"dell_photo_{site_id}", 7 * 86400, fetcher)
+    if not d:
+        return {"ok": False, "site_id": site_id, "city": city, "images": [],
+                "note": "No Creative-Commons city photo found (feed unreachable)."}
+    return {"ok": True, "site_id": site_id, "state": state, "name": row["name"],
+            "kind": row["kind"], "honest": True, **d}
+
+
 # ── LANE ROUTES (OSRM primary + alternatives, cached in PostGIS) ──
 @app.get("/api/route/{lane_id}")
 async def lane_route(lane_id: str, force: bool = False):
@@ -742,12 +812,47 @@ def resolve_incident(iid: str):
 
 
 # ── push a fresh telemetry point (driven by the frontend sim) ──
+# Truck-side path: CAN BUS / OBD-II -> telematics gateway -> KAFKA topic
+# (aegis.events.truck.telemetry) -> ingest consumer -> PostGIS.
+# The gateway container runs on the aegis_default podman network so it can
+# reach both the broker (kafka:9092) and PostGIS (aegis_db:5432). If the
+# gateway is unreachable the API falls back to a direct PostGIS insert so
+# the command center never goes dark.
+import urllib.request as _urlreq
+
+GW_INGEST = os.environ.get("AEGIS_GW_INGEST", "http://127.0.0.1:8411/ingest/telemetry")
+GW_HEALTH = os.environ.get("AEGIS_GW_HEALTH", "http://127.0.0.1:8411/health")
+
+def _via_gateway(rec: dict) -> bool:
+    """Publish one point through the ingest gateway. True on success."""
+    try:
+        req = _urlreq.Request(
+            GW_INGEST,
+            data=json.dumps(rec).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with _urlreq.urlopen(req, timeout=2.0) as r:
+            return r.status == 202
+    except Exception:
+        return False
+
 class TelIn(BaseModel):
     vehicle_id: str; lat: float; lng: float; speed_kmh: float; heading: float
     fuel_pct: float; engine_temp: float; cargo_temp: float; signal_pct: float; gps_acc_m: float
 
 @app.post("/api/telemetry")
 def push_telemetry(t: TelIn):
+    rec = {
+        "vehicle_id": t.vehicle_id, "lat": t.lat, "lng": t.lng,
+        "speed_kmh": t.speed_kmh, "heading": t.heading, "fuel_pct": t.fuel_pct,
+        "engine_temp": t.engine_temp, "cargo_temp": t.cargo_temp,
+        "signal_pct": t.signal_pct, "gps_acc_m": t.gps_acc_m,
+        "ts": datetime.now(timezone.utc).isoformat(),
+    }
+    if _via_gateway(rec):
+        return {"ok": True, "route": "kafka:aegis.events.truck.telemetry"}
+    # fallback: direct PostGIS (gateway down)
     with db() as c, c.cursor() as cur:
         cur.execute("""INSERT INTO telemetry (vehicle_id,lat,lng,speed_kmh,heading,fuel_pct,engine_temp,
                        cargo_temp,signal_pct,gps_acc_m,geom)
@@ -755,7 +860,7 @@ def push_telemetry(t: TelIn):
                     (t.vehicle_id,t.lat,t.lng,t.speed_kmh,t.heading,t.fuel_pct,t.engine_temp,
                      t.cargo_temp,t.signal_pct,t.gps_acc_m,t.lng,t.lat))
         c.commit()
-    return {"ok": True}
+    return {"ok": True, "route": "postgis:direct(fallback)"}
 
 
 # ── shipment lifecycle ──
@@ -1026,6 +1131,339 @@ async def overview():
         "weather": weather,
         "conditions": cond,
     }
+
+# ── STACK / DATA-PROVENANCE (evidence that every feed is live) ──────
+# Aggregates, in one call, proof that each data source is actually live:
+# the internal PostGIS, the open-data feeds, and the analytics platform
+# (captor → Kafka → pipeline → lake → Trino/Grafana). Each source returns
+# a status + a human-readable detail so the STACK tab can show it auditable.
+STACK_TIMEOUT = 6.0
+
+async def _probe_http(url, headers=None, timeout=STACK_TIMEOUT):
+    """Return (ok, payload_dict_or_None, note). Never raises."""
+    try:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as hc:
+            r = await hc.get(url, headers=headers or {})
+            r.raise_for_status()
+            try:
+                return True, r.json(), None
+            except Exception:
+                return True, {"raw": r.text[:200]}, None
+    except Exception as e:
+        return False, None, str(e).split("\n")[0][:120]
+
+@app.get("/api/stack")
+async def stack_evidence():
+    """Auditable provenance: prove every feed / data path is live right now."""
+    import asyncio, datetime
+
+    # ---- 1. internal PostGIS (single source of truth) ----
+    db_proof = {"status": "down", "detail": "unreachable", "meta": {}}
+    try:
+        with db() as c, c.cursor() as cur:
+            cur.execute("SELECT count(*), max(ts) FROM telemetry")
+            tel_n, tel_max = cur.fetchone()
+            cur.execute("SELECT count(*) FROM vehicles")
+            veh_n = cur.fetchone()[0]
+            cur.execute("SELECT count(*) FROM incidents WHERE resolved_at IS NULL")
+            inc_n = cur.fetchone()[0]
+            cur.execute("SELECT count(*) FROM components")
+            comp_n = cur.fetchone()[0]
+            age = (datetime.datetime.now(datetime.timezone.utc) - tel_max).total_seconds() if tel_max else None
+        db_proof = {
+            "status": "live",
+            "detail": f"telemetry {tel_n:,} rows · last point {int(age)}s ago",
+            "meta": {"telemetry_rows": tel_n, "last_telemetry_age_s": int(age) if age is not None else None,
+                     "vehicles": veh_n, "incidents_open": inc_n, "components": comp_n},
+        }
+    except Exception as e:
+        db_proof["detail"] = str(e).split("\n")[0][:120]
+
+    # ---- 2. open-data feeds (keyless) ----
+    feed_specs = [
+        ("eonet", "NASA EONET", "natural & man-made events",
+         "https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=100"),
+        ("usgs", "USGS Earthquakes", "M3+ past 24h (geojson)",
+         "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson"),
+        ("openmeteo", "Open-Meteo (weather)", "keyless weather · via /api/weather (cached)",
+         "http://127.0.0.1:8300/api/weather"),
+    ]
+    feeds = {}
+    async def _feed(kind, name, desc, url):
+        ok, payload, note = await _probe_http(url)
+        count = None
+        if ok:
+            if kind == "eonet":
+                count = len((payload or {}).get("events", []))
+            elif kind == "usgs":
+                feats = (payload or {}).get("features", [])
+                count = sum(1 for f in feats if (f.get("properties", {}).get("mag") or 0) >= 3.0)
+            elif kind == "openmeteo":
+                src=(payload or {}).get("source")
+                hubs=(payload or {}).get("hubs")
+                n=len(hubs) if isinstance(hubs, list) else 0
+                t=hubs[0].get("temp") if (n and isinstance(hubs[0], dict)) else None
+                count = f"{n} hubs · {src}" if src else (f"{t}°C" if t is not None else n or 1)
+        feeds[kind] = {"name": name, "desc": desc, "status": "live" if ok else "offline",
+                       "count": count, "note": None if ok else note, "url": url}
+    await asyncio.gather(*[_feed(*s) for s in feed_specs])
+
+    # ---- 3. truck-side Kafka ingest (gateway on aegis_default net) ----
+    gw_ok, gw_payload, gw_note = await _probe_http("http://127.0.0.1:8411/health")
+    truck_kafka = {
+        "status": "live" if gw_ok else "offline",
+        "topic": "aegis.events.truck.telemetry",
+        "note": gw_note,
+        "points_received": (gw_payload or {}).get("points_received"),
+        "points_produced": (gw_payload or {}).get("points_produced"),
+        "points_consumed": (gw_payload or {}).get("points_consumed"),
+        "points_written": (gw_payload or {}).get("points_written"),
+        "last_record_at": (gw_payload or {}).get("last_record_at"),
+    }
+
+    # ---- 4. analytics platform (captor → Kafka → pipeline → lake) ----
+    async def _svc(url, kind):
+        ok, payload, note = await _probe_http(url)
+        return kind, ok, payload, note
+    trino_ok, trino_payload, trino_note = await _probe_http("http://127.0.0.1:8543/v1/info")
+    grafana_ok, grafana_payload, grafana_note = await _probe_http("http://127.0.0.1:3000/api/health")
+    kafka_ok, kafka_payload, kafka_note = await _probe_http("http://127.0.0.1:8040/")
+    captor_ok, captor_payload, captor_note = await _probe_http("http://127.0.0.1:8400/health")
+    lineage_ok, lineage_payload, lineage_note = await _probe_http("http://127.0.0.1:8401/api/context/tables")
+
+    lineage = {"status": "offline", "summary": None, "tables": []}
+    if lineage_ok and lineage_payload:
+        lin_tables = lineage_payload.get("tables", [])
+        lineage = {
+            "status": "live",
+            "summary": lineage_payload.get("summary"),
+            "tables": [
+                {"name": t.get("name"), "kind": t.get("kind"),
+                 "source_rows": (t.get("source") or {}).get("rows"),
+                 "topic": (t.get("topic") or {}).get("name"),
+                 "lake_rows": (t.get("lake") or {}).get("rows"),
+                 "contract": (t.get("contract") or {}).get("status")}
+                for t in lin_tables
+            ],
+        }
+
+    return {
+        "ok": True,
+        "ts": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "db": db_proof,
+        "feeds": list(feeds.values()),
+        "truck_kafka": truck_kafka,
+        "analytics": {
+            "captor": {"status": "live" if captor_ok else "offline",
+                       "detail": (captor_payload or {}).get("last_cycle_at", "") if captor_ok else captor_note,
+                       "bootstrap": (captor_payload or {}).get("bootstrap", {}),
+                       "tables": {k: v.get("state") for k, v in ((captor_payload or {}).get("tables", {})).items()}},
+            "trino": {"status": "live" if trino_ok else "offline",
+                      "version": (trino_payload or {}).get("nodeVersion", {}).get("version") if trino_ok else None,
+                      "note": trino_note},
+            "grafana": {"status": "live" if grafana_ok else "offline",
+                        "state": (grafana_payload or {}).get("commit") and "up" or (None if not grafana_ok else None),
+                        "note": grafana_note},
+            "kafka_ui": {"status": "live" if kafka_ok else "offline", "note": kafka_note},
+            "lineage": lineage,
+        },
+        "links": {
+            "analytics_dashboard": "http://127.0.0.1:8401/",
+            "grafana": "http://127.0.0.1:3000/",
+            "kafka_ui": "http://127.0.0.1:8040/",
+            "trino": "http://127.0.0.1:8543/",
+        },
+    }
+
+# ── LIVE WORLD FEEDS (server-side proxies with kv cache) ─────────────
+# The browser cannot hit these directly (CORS / rate limits), so the API
+# fetches them, caches them, and serves them. Every feed is keyless/open.
+
+def _kv_cached(key, ttl_s, fetcher):
+    """Return cached kv value if fresh, else run fetcher and cache the result."""
+    with db() as c, c.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute("SELECT value FROM kv WHERE key=%s", (key,))
+        row = cur.fetchone()
+        if row and row["value"].get("_fetched_at"):
+            age = time.time() - row["value"]["_fetched_at"]
+            if age < ttl_s:
+                return row["value"], "CACHED"
+    try:
+        data = fetcher()
+    except Exception:
+        data = None
+    if data is None:
+        return (row["value"] if row else None), "STALE" if row else "OFFLINE"
+    payload = {**data, "_fetched_at": time.time()}
+    with db() as c, c.cursor() as cur:
+        cur.execute("INSERT INTO kv (key, value) VALUES (%s,%s::jsonb) "
+                    "ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, fetched_at=now()",
+                    (key, json.dumps(payload)))
+        c.commit()
+    return payload, "LIVE"
+
+def _http_get_json(url, params=None, timeout=20.0):
+    with httpx.Client(timeout=timeout, follow_redirects=True) as hc:
+        r = hc.get(url, params=params)
+        r.raise_for_status()
+        return r.json()
+
+def _fetch_opensky():
+    """Live ADS-B aircraft worldwide (OpenSky, keyless)."""
+    j = _http_get_json("https://opensky-network.org/api/states/all",
+                       {"point_radius": 55000000, "point_lat": 10, "point_lng": -40})
+    states = j.get("states") or []
+    acs = []
+    for s in states:
+        try:
+            if s[5] is None or s[6] is None:
+                continue
+            acs.append({
+                "id": s[0], "callsign": (s[1] or "").strip(), "country": s[2] or "",
+                "lon": s[5], "lat": s[6], "alt": s[7], "ground": s[8],
+                "vel": s[9], "track": s[10], "vrate": s[11],
+            })
+        except Exception:
+            continue
+    return {"count": len(acs), "aircraft": acs[:4000], "source": "opensky-network.org (ADS-B)"}
+
+def _fetch_ships():
+    """Live AIS ships through the Strait of Hormuz (keyless, server-side)."""
+    j = _http_get_json("https://hormuz.data-tracking.net/api/ships", {"limit": 300})
+    items = j if isinstance(j, list) else (j.get("data") or j.get("ships") or [])
+    ships = []
+    for s in items:
+        try:
+            lat, lon = s.get("latitude"), s.get("longitude")
+            if lat is None:
+                fixes = s.get("fixes") or []
+                if isinstance(fixes, list) and fixes and isinstance(fixes[0], (list, tuple)) and len(fixes[0]) >= 2:
+                    lon, lat = fixes[0][0], fixes[0][1]
+            ships.append({
+                "name": (s.get("name") or s.get("vessel") or "UNKNOWN").upper(),
+                "type": s.get("ship_category") or s.get("type") or s.get("category") or "UNKNOWN",
+                "lat": lat, "lon": lon,
+                "speed": s.get("speed") or s.get("sog") or 0,
+                "course": s.get("course") or s.get("hdg") or 0,
+                "dwt": s.get("dwt"), "flag": s.get("flag") or "",
+                "dest": s.get("destination") or "",
+                "zone": s.get("zone") or "",
+            })
+        except Exception:
+            continue
+    ships = [s for s in ships if s["lat"] is not None and s["lon"] is not None]
+    return {"count": len(ships), "ships": ships[:300], "source": "hormuz.data-tracking.net (AIS)"}
+
+def _fetch_alerts():
+    """Active US weather alerts (NOAA api.weather.gov, keyless).
+    Points come from two sources, both honest:
+      1. the alert's own polygon geometry (exact, ~17 alerts)
+      2. a cached Nominatim geocode of the alert's area name (best-effort,
+         filled in incrementally over the first few polls — 1 req/1.1s per Nominatim policy)
+    """
+    import re as _re, threading
+    j = _http_get_json("https://api.weather.gov/alerts", {"active": "true"})
+    # ---- recover persisted geocode cache (area name -> [lat, lon] or null) ----
+    gcache = {}
+    try:
+        with db() as c, c.cursor() as cur:
+            cur.execute("SELECT value FROM kv WHERE key='alerts_geocode'")
+            row = cur.fetchone()
+            if row and isinstance(row[0], dict):
+                gcache = {k: v for k, v in row[0].items() if v}
+    except Exception:
+        pass
+    _lock = threading.Lock()
+    budget = {"n": 0}
+    def _geocode(area):
+        tok = _re.split(r";| and | to |, ", area)[0].strip()
+        if not tok:
+            return None
+        if tok in gcache:
+            return gcache[tok]
+        with _lock:
+            if budget["n"] >= 20:          # max 20 fresh geocodes per poll (~24s)
+                return None
+            budget["n"] += 1
+        try:
+            r = httpx.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={"q": tok, "format": "json", "limit": 1},
+                headers={"User-Agent": "aegis-demo/1.0"}, timeout=10).json()
+            hit = [float(r[0]["lat"]), float(r[0]["lon"])] if r else None
+        except Exception:
+            hit = None
+        gcache[tok] = hit
+        time.sleep(1.1)                    # Nominatim usage policy
+        return hit
+    al = []
+    for f in j.get("features", []):
+        p = f.get("properties", {})
+        g = f.get("geometry") or {}
+        lat = lon = None
+        src = None
+        try:
+            if g.get("coordinates"):
+                def _first(pt):
+                    if isinstance(pt, (int, float)):
+                        return pt
+                    return _first(pt[0]) if pt else None
+                coords = g["coordinates"]
+                lon = _first(coords[0][0])
+                lat = _first(coords[0][1])
+                src = "geometry"
+        except Exception:
+            pass
+        if lat is None:
+            area = p.get("areaDesc")
+            if area:
+                hit = _geocode(area)
+                if hit:
+                    lon, lat = hit
+                    src = "geocode"
+        al.append({
+            "id": p.get("id"), "event": p.get("event"), "severity": p.get("severity"),
+            "area": p.get("areaDesc"), "lat": lat, "lon": lon, "src": src,
+            "desc": (p.get("description") or "")[:200],
+        })
+    # ---- persist geocode cache (plain jsonb dict, same shape _kv_cached uses) ----
+    try:
+        with db() as c, c.cursor() as cur:
+            cur.execute(
+                "INSERT INTO kv (key, value) VALUES ('alerts_geocode', %s::jsonb) "
+                "ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, fetched_at=now()",
+                (json.dumps(gcache),))
+            c.commit()
+    except Exception:
+        pass
+    plotted = sum(1 for a in al if a["lat"] is not None)
+    return {"count": len(al), "plotted": plotted,
+            "alerts": [a for a in al if a["lat"] is not None][:500],
+            "source": "api.weather.gov (NOAA) · areas: geometry + Nominatim"}
+
+@app.get("/api/air")
+def air_live():
+    d, src_state = _kv_cached("air_live", 600, _fetch_opensky)
+    if d is None:
+        return {"ok": False, "source": src_state, "count": 0, "aircraft": []}
+    return {"ok": True, "source": src_state, "state": src_state, "count": d.get("count"),
+            "aircraft": d.get("aircraft", [])}
+
+@app.get("/api/ships")
+def ships_live():
+    d, src_state = _kv_cached("ships_live", 300, _fetch_ships)
+    if d is None:
+        return {"ok": False, "source": src_state, "count": 0, "ships": []}
+    return {"ok": True, "source": src_state, "state": src_state, "count": d.get("count"),
+            "ships": d.get("ships", [])}
+
+@app.get("/api/alerts")
+def alerts_live():
+    d, src_state = _kv_cached("alerts_live", 300, _fetch_alerts)
+    if d is None:
+        return {"ok": False, "source": src_state, "count": 0, "alerts": []}
+    return {"ok": True, "source": src_state, "state": src_state, "count": d.get("count"),
+            "alerts": d.get("alerts", [])}
 
 @app.get("/api/stats")
 async def stats():

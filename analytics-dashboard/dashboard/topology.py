@@ -348,27 +348,76 @@ def _source_rows():
 
 
 def _lake_rows():
-    """Rijtallen + freshness per lake-tabel (30s cache)."""
+    """Rijtallen + freshness per lake-tabel (30s cache).
+
+    count(*) op elke tabel (metadata in Postgres = snel). max(cycle_ts)
+    alleen op dims — op facts (telemetry/shipment_events, honderd tot
+    duizend+ kleine Parquet-bestanden) faalt max() met een S3-GET-fout en
+    duurt 25s. De facts-freshness komt uit de bron (psycopg2, <10ms).
+    """
     from dashboard import api_core
+    FACTS = {"telemetry", "shipment_events"}
     def f():
         out = {}
         try:
             con = api_core.duck()
             for t in SCHEMAS:
-                sch = "facts" if t in ("telemetry", "shipment_events") else "dims"
-                tscol = "captured_at" if sch == "facts" else "cycle_ts"
-                r = con.execute(
-                    f"SELECT count(*), max({tscol}) FROM {sch}.{t}").fetchone()
-                mx = r[1]
-                if mx is not None and mx.tzinfo is None:
-                    mx = mx.replace(tzinfo=timezone.utc)
-                age = int((datetime.now(timezone.utc) - mx).total_seconds()) if mx else None
-                out[t] = {"rows": r[0], "age_s": age,
-                          "max_ts": mx.isoformat() if mx else None}
+                sch = "facts" if t in FACTS else "dims"
+                r = con.execute(f"SELECT count(*) FROM {sch}.{t}").fetchone()
+                row = {"rows": r[0], "age_s": None, "max_ts": None}
+                if t not in FACTS:
+                    try:
+                        mx = con.execute(
+                            f"SELECT max(cycle_ts) FROM dims.{t}").fetchone()[0]
+                        if mx is not None:
+                            if mx.tzinfo is None:
+                                mx = mx.replace(tzinfo=timezone.utc)
+                            row["max_ts"] = mx.isoformat()
+                            row["age_s"] = int(
+                                (datetime.now(timezone.utc) - mx).total_seconds())
+                    except Exception:  # noqa
+                        pass
+                out[t] = row
         except Exception as e:  # noqa
             out["error"] = str(e)[:80]
         return out
     return _cached("ctx:lake", 30, f)
+
+
+def _source_freshness():
+    """Freshness per tabel rechtstreeks vanaf de AEGIS-bron (psycopg2, <10ms).
+
+    Gebruikt voor de fact-tabellen (telemetry, shipment_events) die in het
+    lake te groot zijn om max(ts) op te scannen. ts-col per tabel komt uit
+    information_schema; ontbreekt die col dan is age_s=None.
+    """
+    import psycopg2
+    def f():
+        out = {}
+        try:
+            c = psycopg2.connect(host=AEGIS_DB_HOST, port=AEGIS_DB_PORT,
+                                 dbname=AEGIS_DB_DB, user=AEGIS_DB_USER,
+                                 password=AEGIS_DB_PASSWORD, connect_timeout=8,
+                                 options="-c default_transaction_read_only=on")
+            cur = c.cursor()
+            for t in ("telemetry", "shipment_events"):
+                try:
+                    cur.execute(f"SELECT max(ts) FROM {t}")
+                    row = cur.fetchone()
+                    mx = row[0] if row else None
+                    if mx is not None:
+                        if mx.tzinfo is None:
+                            mx = mx.replace(tzinfo=timezone.utc)
+                        out[t] = {"age_s": int(
+                            (datetime.now(timezone.utc) - mx).total_seconds()),
+                                  "max_ts": mx.isoformat()}
+                except Exception:  # noqa
+                    out[t] = {"age_s": None, "max_ts": None}
+            c.close()
+        except Exception as e:  # noqa
+            out["error"] = str(e)[:80]
+        return out
+    return _cached("ctx:srcfresh", 30, f)
 
 
 def _quarantine_24h():
@@ -420,12 +469,19 @@ def _contract(tbl, is_fact):
 def get_context_tables():
     src = _source_rows()
     lake = _lake_rows()
+    fresh = _source_freshness()
     quar = _quarantine_24h()
     tables = []
     for tbl, topic, key, is_fact in TABLES:
         c = _contract(tbl, is_fact)
         q = quar.get(topic, 0)
         l = lake.get(tbl, {})
+        # facts: freshness vanaf de bron (lake max(ts) te traag op kleine bestanden)
+        if is_fact:
+            fs = fresh.get(tbl, {})
+            l = {**l, "age_s": fs.get("age_s", l.get("age_s")),
+                 "max_ts": fs.get("max_ts", l.get("max_ts")),
+                 "freshness_src": "source (aegis_db)" if fs.get("age_s") is not None else "n/a"}
         tables.append({
             "name": tbl,
             "kind": "fact" if is_fact else "dim",
@@ -436,7 +492,8 @@ def get_context_tables():
                          "dedup": " + ".join(key) if is_fact else "upsert op PK " + " + ".join(key)},
             "lake": {"table": f"{'facts' if is_fact else 'dims'}.{tbl}",
                      "rows": l.get("rows"), "age_s": l.get("age_s"),
-                     "max_ts": l.get("max_ts")},
+                     "max_ts": l.get("max_ts"),
+                     "freshness_src": l.get("freshness_src", "lake")},
             "contract": {**c, "violations_24h": q,
                          "status": "yellow" if q else "green"},
             "columns": [{"name": n, "type": _type_map(t)} for n, t in SCHEMAS[tbl]],

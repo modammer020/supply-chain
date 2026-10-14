@@ -100,6 +100,93 @@ def context_tables():
     return topology.get_context_tables()
 
 
+# ── command-center sync (live reads from :8300 + lake) ──────────
+# The analytics platform is the "data + analysis" layer; the operational
+# command center (aegis, :8300) owns the live operational feeds (traffic
+# index, predictions, live air/ships, per-lane conditions). These proxies
+# keep the analytics dashboard IN SYNC with the command center so a single
+# screen shows operations + analysis side by side.
+import urllib.request
+import json as _json
+
+CC_HOST = os.environ.get("CC_HOST", "host.containers.internal")
+CC_PORT = os.environ.get("CC_PORT", "8300")
+
+
+def _cc_get(path: str, timeout: int = 6):
+    """Read-only proxy into the operational command center (:8300)."""
+    url = f"http://{CC_HOST}:{CC_PORT}{path}"
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as r:
+            return _json.loads(r.read().decode("utf-8", "replace"))
+    except Exception as e:
+        return {"error": str(e)[:140], "live": False, "source": "aegis:8300"}
+
+
+@app.get("/api/network/traffic")
+def cc_traffic():
+    d = _cc_get("/api/traffic")
+    d["source"] = d.get("source", "aegis:8300")
+    return d
+
+
+@app.get("/api/network/conditions")
+def cc_conditions(bbox: str = "2,48,22,60"):
+    # CC exposes /api/conditions with bbox as a QUERY param (not path segment)
+    return _cc_get(f"/api/conditions?bbox={bbox}", timeout=10)
+
+
+@app.get("/api/network/air")
+def cc_air():
+    return _cc_get("/api/air", timeout=10)
+
+
+@app.get("/api/network/ships")
+def cc_ships():
+    return _cc_get("/api/ships", timeout=10)
+
+
+@app.get("/api/network/predictions")
+def cc_predictions():
+    return _cc_get("/api/predictions", timeout=10)
+
+
+@app.get("/api/network/stats")
+def cc_stats():
+    return _cc_get("/api/stats")
+
+
+@app.get("/api/network/reroutes")
+def cc_reroutes():
+    """Total reroutes / delays straight off the AEGIS source (read-only)."""
+    try:
+        con = core._aegis()
+        with con.cursor() as cur:
+            cur.execute("SELECT status, count(*) FROM shipments GROUP BY status")
+            by_status = {r[0]: int(r[1]) for r in cur.fetchall()}
+            cur.execute("""
+                SELECT s.id, s.vehicle_id, s.status, s.lane_id,
+                       l.origin, l.destination, round((s.value_eur/1000)::numeric,0) k_eur
+                FROM shipments s
+                LEFT JOIN lanes l ON l.id = s.lane_id
+                WHERE s.status IN ('rerouted','delayed')
+                ORDER BY s.value_eur DESC LIMIT 50""")
+            rows = [dict(zip([d[0] for d in cur.description], r)) for r in cur.fetchall()]
+        total_rerouted = by_status.get("rerouted", 0)
+        total_delayed = by_status.get("delayed", 0)
+        return {
+            "live": True,
+            "source": "aegis_db (read-only)",
+            "by_status": by_status,
+            "total_reroutes": total_rerouted,
+            "total_delays": total_delayed,
+            "total_disrupted": total_rerouted + total_delayed,
+            "items": rows,
+        }
+    except Exception as e:
+        return {"error": str(e)[:140], "live": False, "items": []}
+
+
 @app.get("/api/engineer/items")
 def engineer_items(status: str = None):
     return engineer_api.list_items(status)
@@ -108,7 +195,7 @@ def engineer_items(status: str = None):
 @app.get("/api/engineer/items/{item_id}")
 def engineer_item(item_id: str):
     it = engineer_api.get_item(item_id)
-    return it or {"error": "niet gevonden"}
+    return it or {"error": "not found"}
 
 
 @app.post("/api/engineer/items/{item_id}/review")
@@ -135,9 +222,31 @@ def spa(path: str):
 
 def main():
     import threading
-    # Zelfde app op beide poorten: :8402 = UI + API (één origineel, geen
-    # CORS; de frontend probeert /api/status op location.origin eerst).
-    # :8401 blijft het 'pure API'-origineel voor koppelingen/monitoring.
+    # Same app on both ports: :8402 = UI + API (single origin, no CORS;
+    # the frontend probes /api/status on location.origin first).
+    # :8401 stays the 'pure API' origin for integrations/monitoring.
+
+    def warmup():
+        # Primi de shared state zodat de EERSTE user-request warm is:
+        # KPI-cache (psycopg2 op aegis_db), context-cache (DuckDB-attach +
+        # MinIO-connectie) en de engine (fleet-health). Draait in de
+        # achtergrond, geen impact op de startup-tijd zelf.
+        try:
+            core.get_kpis()
+        except Exception:
+            pass
+        try:
+            topology.get_context_tables()
+        except Exception:
+            pass
+        try:
+            from dashboard import engine as _engine
+            _engine.compute()
+        except Exception:
+            pass
+
+    threading.Thread(target=warmup, daemon=True, name="startup-warmup").start()
+
     def run_ui():
         uvicorn.run(app, host="0.0.0.0", port=8402, log_level="warning")
 

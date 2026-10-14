@@ -6,7 +6,7 @@ Frontend: één HTML-bestand, API-gedreven. Keyless (ESRI tiles, OSRM, Open-Mete
 ## Starten (één commando per service)
 
 ```bash
-cd command-center   # of de map die je hier clone
+cd /home/demouser/aegis
 
 # 1. Database (PostGIS 16, port 5433)
 podman compose up -d
@@ -16,7 +16,7 @@ podman compose up -d
 
 # 3. Frontend (open in browser)
 python3 -m http.server 8765 --bind 127.0.0.1     # vanuit /home/demouser
-# → http://127.0.0.1:8765/command-center/web/index.html
+# → http://127.0.0.1:8765/aegis/web/index.html
 
 # 4. Dedicated analyst agent (watcher + hermes researcher-bot), elke 3 min
 .venv/bin/python agents/watcher.py --interval 180

@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="nl">
 <head>
+<script>
+try{document.documentElement.setAttribute('data-theme',localStorage.getItem('aegis-theme')||'dark');}catch(e){}
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DELL // ANALYTICS — OT·IT COMMAND</title>
@@ -11,13 +14,15 @@
   --bg:#050b1a; --panel:#0a1428; --panel2:#0d1a33; --line:#1c3354;
   --cyan:#22d3ee; --green:#34d399; --amber:#fbbf24; --rose:#fb7185;
   --violet:#a78bfa; --txt:#d7e6fb; --dim:#6f89ad; --faint:#44608a;
+  --h1:#fff; --tabon1:#0d2340; --tt-bg:#0d1a33; --nodefill:#0a1428;
+  --glow1:rgba(34,211,238,.07); --glow2:rgba(167,139,250,.06); --shadow:rgba(2,8,20,.5)
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--txt);font-family:'JetBrains Mono',monospace;
   min-height:100vh;padding:18px 22px 30px;
   background-image:
-    radial-gradient(900px 400px at 15% -5%, rgba(34,211,238,.07), transparent 60%),
-    radial-gradient(800px 400px at 90% 110%, rgba(167,139,250,.06), transparent 60%);}
+    radial-gradient(900px 400px at 15% -5%, var(--glow1), transparent 60%),
+    radial-gradient(800px 400px at 90% 110%, var(--glow2), transparent 60%);}
 header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px}
 .dell-logo{width:40px;height:40px;flex:0 0 40px;display:flex;align-items:center;justify-content:center;
   filter:drop-shadow(0 0 8px rgba(0,125,184,.65));animation:hexGlow 4s ease-in-out infinite;cursor:default}
@@ -26,7 +31,7 @@ header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16p
 .pulse{width:10px;height:10px;border-radius:50%;background:var(--cyan);
   box-shadow:0 0 12px var(--cyan);animation:pulse 1.6s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.75)}}
-h1{font-family:'Rajdhani';font-size:26px;letter-spacing:3px;font-weight:700;color:#fff}
+h1{font-family:'Rajdhani';font-size:26px;letter-spacing:3px;font-weight:700;color:var(--h1)}
 h1 span{color:var(--cyan);text-shadow:0 0 14px rgba(34,211,238,.6)}
 h1 .sub{display:block;font-size:9.5px;letter-spacing:2.5px;color:var(--dim);font-weight:500;margin-top:2px}
 .badges{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
@@ -40,24 +45,42 @@ h1 .sub{display:block;font-size:9.5px;letter-spacing:2.5px;color:var(--dim);font
 .tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
 .tab{font-family:'Rajdhani';font-size:13px;letter-spacing:2px;padding:7px 16px;
   border:1px solid var(--line);border-radius:8px;cursor:pointer;color:var(--dim);background:var(--panel)}
-.tab.on{color:#fff;border-color:var(--cyan);background:linear-gradient(180deg,#0d2340,#0a1428);
+.tab.on{color:var(--h1);border-color:var(--cyan);background:linear-gradient(180deg,var(--tabon1),var(--panel));
   box-shadow:0 0 14px rgba(34,211,238,.25)}
 .tab .n{color:var(--rose);font-weight:700}
 .view{display:none}.view.on{display:block}
 /* KPI grid */
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px}
+
+/* ── LIGHT MODE (toggle in header, preference in localStorage) ── */
+html[data-theme="light"]{
+  --bg:#eef3f9; --panel:#ffffff; --panel2:#f2f6fc; --line:#c7d4e6;
+  --txt:#152238; --dim:#48607e; --faint:#7d90a9;
+  --cyan:#0891b2; --green:#059669; --amber:#b45309; --rose:#e11d48; --violet:#7c3aed;
+  --h1:#0d1b2e; --tabon1:#dbe7f5; --tt-bg:#ffffff; --nodefill:#ffffff;
+  --glow1:rgba(8,145,178,.08); --glow2:rgba(124,58,237,.06); --shadow:rgba(20,40,80,.18);
+}
+html[data-theme="light"] .kpi{box-shadow:0 1px 2px rgba(20,40,80,.08)}
+html[data-theme="light"] .panel{box-shadow:0 1px 2px rgba(20,40,80,.06)}
+html[data-theme="light"] .dell-logo{filter:drop-shadow(0 0 6px rgba(0,125,184,.35))}
+html[data-theme="light"] #topo-tt{box-shadow:0 6px 20px rgba(20,40,80,.18)}
+.theme-toggle{display:flex;align-items:center;gap:6px;padding:6px 12px;
+  border:1px solid var(--line);border-radius:20px;cursor:pointer;color:var(--dim);
+  background:var(--panel);font-size:10px;letter-spacing:1px;user-select:none;transition:border-color .2s,color .2s}
+.theme-toggle:hover{border-color:var(--cyan);color:var(--cyan)}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px;margin-bottom:12px}
 .kpis.ot{border-top:1px dashed rgba(167,139,250,.35);padding-top:12px}
 .kpi{position:relative;background:linear-gradient(180deg,var(--panel2),var(--panel));
-  border:1px solid var(--line);border-radius:10px;padding:14px 16px 12px;cursor:pointer;
+  border:1px solid var(--line);border-radius:9px;padding:10px 12px 9px;cursor:pointer;
   transition:border-color .25s, box-shadow .25s}
 .kpi:hover,.kpi.sel{border-color:var(--cyan);box-shadow:0 0 18px rgba(34,211,238,.25), inset 0 0 24px rgba(34,211,238,.05)}
 #inc li{transition:background .15s}
 #inc li[data-vid]:not([data-vid=""]){cursor:pointer}
 #inc li[data-vid]:not([data-vid=""]):hover{background:rgba(34,211,238,.07)}
-.kpi .label{font-size:10px;letter-spacing:1.4px;color:var(--dim);text-transform:uppercase;display:flex;justify-content:space-between}
+.kpi .label{font-size:9px;letter-spacing:1px;color:var(--dim);text-transform:uppercase;display:flex;justify-content:space-between}
 .kpi .label .info{cursor:help;color:var(--faint)}
-.kpi .val{font-family:'Rajdhani';font-size:34px;font-weight:700;color:#fff;line-height:1.15;margin-top:4px}
-.kpi .val small{font-size:14px;color:var(--dim);font-weight:500}
+.kpi .val{font-family:'Rajdhani';font-size:24px;font-weight:700;color:var(--h1);line-height:1.1;margin-top:3px}
+.kpi .val small{font-size:11px;color:var(--dim);font-weight:500}
 .kpi .foot{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:9.5px;color:var(--faint);flex-wrap:wrap}
 .dot{width:7px;height:7px;border-radius:50%;flex:none}
 .dot.green{background:var(--green);box-shadow:0 0 8px var(--green)}
@@ -72,7 +95,7 @@ h1 .sub{display:block;font-size:9.5px;letter-spacing:2.5px;color:var(--dim);font
 @media(max-width:1100px){.grid,.grid3{grid-template-columns:1fr}}
 .panel{background:linear-gradient(180deg,var(--panel2),var(--panel));
   border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-height:200px}
-.panel h2{font-family:'Rajdhani';font-size:15px;letter-spacing:2px;color:#fff;
+.panel h2{font-family:'Rajdhani';font-size:15px;letter-spacing:2px;color:var(--h1);
   display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .panel h2 .dot{margin-left:auto}
 .panel h2 .sub{font-size:10px;color:var(--faint);letter-spacing:1px;font-family:'JetBrains Mono'}
@@ -97,6 +120,9 @@ tr[data-vid]:hover td{background:rgba(34,211,238,.08)}
 .bar i{display:block;height:100%;border-radius:3px}
 .sev{font-weight:600;font-size:10px;letter-spacing:1px}
 .sev.P1{color:var(--rose)}.sev.P2{color:var(--amber)}.sev.P3{color:var(--dim)}
+.sev.warning{color:var(--amber);background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.4);padding:1px 6px;border-radius:4px}
+.sev.critical{color:var(--rose);background:rgba(251,113,133,.12);border:1px solid rgba(251,113,133,.4);padding:1px 6px;border-radius:4px}
+.sev.ok{color:var(--green);background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.4);padding:1px 6px;border-radius:4px}
 .mono{font-family:monospace;font-size:10.5px}
 .dim{color:var(--faint)}
 /* incidents */
@@ -130,7 +156,7 @@ select{background:var(--panel2);color:var(--txt);border:1px solid var(--line);
 .rec{border-left:3px solid var(--line);padding:9px 11px;margin-bottom:9px;
   background:rgba(13,26,51,.6);border-radius:0 8px 8px 0;font-size:11px}
 .rec.P1{border-color:var(--rose)}.rec.P2{border-color:var(--amber)}.rec.P3{border-color:var(--dim)}
-.rec .a{color:#fff;font-size:12px;margin:3px 0}
+.rec .a{color:var(--h1);font-size:12px;margin:3px 0}
 .rec .w{color:var(--dim);font-size:10.5px;line-height:1.5}
 .hdr{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .hdr .titlebox{display:flex;flex-direction:column;gap:1px}
@@ -160,7 +186,7 @@ footer{margin-top:16px;font-size:10px;color:var(--faint);letter-spacing:1px;disp
 .tp-win button{font-family:'JetBrains Mono';font-size:9px;padding:2px 8px;border:1px solid var(--line);
   border-radius:10px;background:transparent;color:var(--dim);cursor:pointer;letter-spacing:.5px}
 .tp-win button.on{color:var(--cyan);border-color:rgba(34,211,238,.5);background:rgba(34,211,238,.08)}
-.tp-val{font-family:'Rajdhani';font-size:19px;font-weight:700;color:#fff;letter-spacing:1px}
+.tp-val{font-family:'Rajdhani';font-size:19px;font-weight:700;color:var(--h1);letter-spacing:1px}
 .tp-val small{font-size:10px;color:var(--dim);font-weight:500;letter-spacing:0}
 .tp-sub{font-size:9px;color:var(--faint);letter-spacing:.8px}
 /* ── TOPOLOGIE ─────────────────────────────────────────────── */
@@ -168,7 +194,7 @@ footer{margin-top:16px;font-size:10px;color:var(--faint);letter-spacing:1px;disp
   border:1px solid var(--line);border-radius:10px;padding:10px;overflow-x:auto}
 #topo-svg{width:100%;min-width:1150px;height:auto;display:block}
 .tnode{cursor:pointer}
-.tnode rect{fill:#0a1428;stroke:var(--line);stroke-width:1;rx:9;transition:stroke .2s, filter .2s}
+.tnode rect{fill:var(--nodefill);stroke:var(--line);stroke-width:1;rx:9;transition:stroke .2s, filter .2s}
 .tnode:hover rect,.tnode.hl rect{stroke:var(--cyan);filter:drop-shadow(0 0 10px rgba(34,211,238,.55))}
 .tnode .tn-name{font-family:'Rajdhani';font-size:14px;font-weight:700;letter-spacing:1.5px;fill:#fff}
 .tnode .tn-sub{font-family:'JetBrains Mono';font-size:8.6px;fill:var(--dim);letter-spacing:.3px}
@@ -176,31 +202,69 @@ footer{margin-top:16px;font-size:10px;color:var(--faint);letter-spacing:1px;disp
 .tnode .tn-lat{font-family:'JetBrains Mono';font-size:9px;fill:var(--dim)}
 .tnode .stat{transition:r .2s}
 .tstage{cursor:pointer}
-.tstage rect{fill:#0a1428;stroke:var(--line);stroke-width:1;transition:stroke .2s, filter .2s}
+.tstage rect{fill:var(--nodefill);stroke:var(--line);stroke-width:1;transition:stroke .2s, filter .2s}
 .tstage:hover rect,.tstage.hl rect{stroke:var(--cyan);filter:drop-shadow(0 0 12px rgba(34,211,238,.55))}
 .ebase{fill:none;stroke:rgba(28,51,84,.9);stroke-width:1.4}
 .eflow{fill:none;stroke-width:2;stroke-dasharray:7 9;stroke-linecap:round;animation:flowdash 1.1s linear infinite}
 @keyframes flowdash{to{stroke-dashoffset:-32}}
 .elbl{font-family:'JetBrains Mono';font-size:8.6px;fill:var(--dim);letter-spacing:.3px}
 .elbl.bg{paint-order:stroke;stroke:var(--bg);stroke-width:3px}
-#topo-tt{position:absolute;pointer-events:none;background:#0d1a33;border:1px solid var(--cyan);
+#topo-tt{position:absolute;pointer-events:none;background:var(--tt-bg);border:1px solid var(--cyan);
   border-radius:8px;padding:9px 11px;font-size:10.5px;max-width:280px;color:var(--txt);
   box-shadow:0 0 18px rgba(34,211,238,.3);display:none;z-index:5;line-height:1.5}
-#topo-tt b{color:#fff;font-family:'Rajdhani';letter-spacing:1px;font-size:13px}
+#topo-tt b{color:var(--h1);font-family:'Rajdhani';letter-spacing:1px;font-size:13px}
 #topo-tt .tt-row{display:flex;justify-content:space-between;gap:12px;margin-top:3px}
-/* layered architecture spine */
-.tr-rail{stroke:var(--cyan);stroke-width:2;opacity:.45}
-.tr-circle{fill:#0a1428;stroke:var(--cyan);stroke-width:1.6}
-.tr-num{fill:var(--cyan);font-family:'Rajdhani';font-size:15px;font-weight:700;letter-spacing:1px;text-anchor:middle;dominant-baseline:central}
-.tr-title{font-family:'Rajdhani';font-size:13.5px;font-weight:700;letter-spacing:1.6px;fill:#fff}
-.tr-sub{font-family:'JetBrains Mono';font-size:8.7px;fill:var(--dim);letter-spacing:.3px}
-.tr-conn{stroke:var(--line);stroke-width:1.5;fill:none}
-.chev{fill:none;stroke:var(--cyan);stroke-width:2.4;stroke-dasharray:6 8;stroke-linecap:round;animation:flowdash 1.1s linear infinite}
-.tr-step{font-family:'JetBrains Mono';font-size:9.3px;fill:var(--cyan);letter-spacing:.4px}
-.backedge{fill:none;stroke:var(--amber);stroke-width:1.4;stroke-dasharray:4 6;opacity:.5}
-.tcard-port{font-family:'JetBrains Mono';font-size:8px;fill:var(--faint)}
-#topo-legend{display:flex;gap:14px;flex-wrap:wrap;margin:8px 4px 2px;font-size:9.5px;color:var(--dim);letter-spacing:.5px}
-#topo-legend .lg{display:flex;align-items:center;gap:5px}
+/* ── TOPOLOGY: stacked stage bars + pulsing links ─────────── */
+#topo-bars{display:flex;flex-direction:column;gap:0;margin:6px 2px 2px;position:relative}
+.tpo-stage{display:grid;grid-template-columns:44px 1fr auto;align-items:center;gap:14px;
+  background:linear-gradient(90deg,rgba(34,211,238,.10),var(--panel) 40%);
+  border:1px solid var(--line);border-radius:10px;padding:11px 16px;position:relative;
+  transition:border-color .2s, box-shadow .2s}
+.tpo-stage:hover{border-color:var(--cyan);box-shadow:0 0 16px rgba(34,211,238,.18)}
+.tpo-stage.is-up{border-left:3px solid var(--green)}
+.tpo-stage.is-warn{border-left:3px solid var(--amber)}
+.tpo-stage.is-down{border-left:3px solid var(--rose)}
+.tpo-num{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:var(--nodefill);border:1.6px solid var(--cyan);color:var(--cyan);
+  font-family:'Rajdhani';font-size:18px;font-weight:700}
+.tpo-title{font-family:'Rajdhani';font-size:14.5px;font-weight:700;letter-spacing:1.5px;color:var(--h1)}
+.tpo-title .tpo-chip{font-family:'JetBrains Mono';font-size:9px;font-weight:500;letter-spacing:.3px;
+  color:var(--dim);border:1px solid var(--line);border-radius:5px;padding:1px 6px;margin-left:8px;vertical-align:2px}
+.tpo-desc{font-size:10.8px;color:var(--dim);line-height:1.5;margin-top:3px;max-width:820px}
+.tpo-desc b{color:var(--txt);font-weight:600}
+.tpo-desc .mono{color:var(--cyan)}
+.tpo-meta{display:flex;flex-direction:column;align-items:flex-end;gap:3px;min-width:86px}
+.tpo-meta .mono{font-size:9.5px;color:var(--dim)}
+.tpo-url{font-family:'JetBrains Mono';font-size:9px;color:var(--cyan);text-decoration:none}
+.tpo-url:hover{text-decoration:underline}
+/* pulsing link between two bars */
+.tpo-link{display:grid;grid-template-columns:44px 1fr auto;align-items:center;gap:14px;height:46px;padding:0 16px}
+.tpo-link .tpo-conn{grid-column:1/2;width:34px;height:100%;position:relative;display:flex;justify-content:center}
+.tpo-line{width:3px;height:100%;background:var(--line);border-radius:2px;position:relative;overflow:hidden}
+.tpo-line::before{content:'';position:absolute;left:0;top:-40%;width:100%;height:40%;
+  background:linear-gradient(180deg,transparent,var(--cyan),transparent);
+  animation:tpoflow 1.3s linear infinite}
+.tpo-link.dead .tpo-line::before{animation:none;background:var(--rose);height:100%}
+.tpo-link.dead .tpo-line{background:rgba(244,63,94,.3)}
+.tpo-flow{display:none}
+.tpo-linklabel{grid-column:2/3;font-family:'JetBrains Mono';font-size:10px;color:var(--dim);
+  letter-spacing:.3px;position:relative;padding-left:14px}
+.tpo-linklabel::before{content:'';position:absolute;left:0;top:50%;width:8px;height:8px;border-radius:50%;
+  background:var(--cyan);transform:translateY(-50%);box-shadow:0 0 8px var(--cyan);animation:tpopulse 1.6s ease-in-out infinite}
+.tpo-linklabel b{color:var(--cyan);font-weight:600}
+.tpo-link .tpo-lmeta{grid-column:3/4;font-family:'JetBrains Mono';font-size:9px;color:var(--faint)}
+@keyframes tpopulse{0%,100%{opacity:.4;transform:translateY(-50%) scale(.8)}50%{opacity:1;transform:translateY(-50%) scale(1.25)}}
+@keyframes tpoflow{0%{top:-40%}100%{top:110%}}
+/* direct-read bypass annotations */
+.tpo-bypass{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+.tpo-by{flex:1;min-width:260px;border:1px dashed var(--amber);border-radius:9px;padding:9px 12px;
+  background:rgba(251,191,36,.05)}
+.tpo-by .h{font-family:'Rajdhani';font-size:11.5px;font-weight:700;letter-spacing:1px;color:var(--amber);display:flex;align-items:center;gap:7px}
+.tpo-by .h .bndot{width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber);animation:tpopulse 1.6s ease-in-out infinite}
+.tpo-by .t{font-size:10.3px;color:var(--dim);line-height:1.5;margin-top:4px}
+.tpo-by .t b{color:var(--txt)}
+#topo-legend{display:flex;gap:14px;flex-wrap:wrap;margin:10px 2px 0;font-size:9.5px;color:var(--dim);letter-spacing:.5px}
+#topo-legend .lg{display:flex;align-items:center;gap:6px}
 #topo-legend i{width:16px;height:3px;border-radius:2px;display:inline-block}
 #topo-pulse{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
 /* ── DATA CONTEXT ──────────────────────────────────────────── */
@@ -208,14 +272,14 @@ footer{margin-top:16px;font-size:10px;color:var(--faint);letter-spacing:1px;disp
 .ctx-card{background:linear-gradient(180deg,var(--panel2),var(--panel));border:1px solid var(--line);
   border-radius:9px;padding:12px 14px}
 .ctx-card .l{font-size:9.5px;letter-spacing:1.3px;color:var(--dim);text-transform:uppercase}
-.ctx-card .v{font-family:'Rajdhani';font-size:28px;font-weight:700;color:#fff;margin-top:3px}
+.ctx-card .v{font-family:'Rajdhani';font-size:28px;font-weight:700;color:var(--h1);margin-top:3px}
 .ctx-card .s{font-size:9.5px;color:var(--faint);margin-top:2px}
 .trow{border:1px solid var(--line);border-radius:9px;margin-bottom:9px;overflow:hidden;
   background:linear-gradient(180deg,var(--panel2),var(--panel))}
 .trow-h{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;flex-wrap:wrap;
   transition:background .15s}
 .trow-h:hover{background:rgba(34,211,238,.06)}
-.trow-h .tt{font-family:'Rajdhani';font-size:15px;letter-spacing:1px;color:#fff;font-weight:700}
+.trow-h .tt{font-family:'Rajdhani';font-size:15px;letter-spacing:1px;color:var(--h1);font-weight:700}
 .trow-h .flow{display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono';font-size:9.5px;
   color:var(--dim);flex-wrap:wrap;margin-left:auto}
 .trow-h .flow b{color:var(--cyan);font-weight:500}
@@ -250,11 +314,15 @@ footer{margin-top:16px;font-size:10px;color:var(--faint);letter-spacing:1px;disp
     </div>
   </div>
   <div class="badges" id="badges"></div>
+  <div class="theme-toggle" id="themeToggle" title="Switch light / dark">
+    <span id="themeIco">☀ LIGHT</span>
+  </div>
 </header>
 
 <div class="tabs">
   <div class="tab on" data-v="ops">OPERATIONS <span class="n" id="t-ops-n"></span></div>
-  <div class="tab" data-v="topology">TOPOLOGIE</div>
+  <div class="tab" data-v="network">NETWORK · LIVE <span class="n" id="t-net-n"></span></div>
+  <div class="tab" data-v="topology">ARCHITECTURE</div>
   <div class="tab" data-v="context">DATA CONTEXT <span class="n" id="t-ctx-n"></span></div>
   <div class="tab" data-v="fleet">FLEET HEALTH · PREDICTIVE</div>
   <div class="tab" data-v="supervisor">SUPERVISOR</div>
@@ -313,20 +381,71 @@ footer{margin-top:16px;font-size:10px;color:var(--faint);letter-spacing:1px;disp
   </div>
 </div>
 
+<!-- ══════════════ NETWORK · LIVE (traffic, reroutes, predictions, air/ships) ══════════════ -->
+<div class="view" id="v-network">
+  <div id="net-pulse"></div>
+  <!-- summary cards -->
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:12px">
+    <div class="panel" style="padding:12px 14px"><div class="l dim" style="font-size:9.5px;letter-spacing:1px;text-transform:uppercase">Active shipments</div><div class="mono" id="net-ship" style="font-size:26px;font-weight:700;color:var(--h1)">—</div><div class="dim" id="net-ship-s" style="font-size:9.5px">—</div></div>
+    <div class="panel" style="padding:12px 14px"><div class="l dim" style="font-size:9.5px;letter-spacing:1px;text-transform:uppercase">Total reroutes</div><div class="mono" id="net-reroute" style="font-size:26px;font-weight:700;color:var(--amber)">—</div><div class="dim" id="net-reroute-s" style="font-size:9.5px">of all shipments</div></div>
+    <div class="panel" style="padding:12px 14px"><div class="l dim" style="font-size:9.5px;letter-spacing:1px;text-transform:uppercase">Delays</div><div class="mono" id="net-delay" style="font-size:26px;font-weight:700;color:var(--rose)">—</div><div class="dim" id="net-delay-s" style="font-size:9.5px">delayed + rerouted</div></div>
+    <div class="panel" style="padding:12px 14px"><div class="l dim" style="font-size:9.5px;letter-spacing:1px;text-transform:uppercase">Live lanes</div><div class="mono" id="net-lanes" style="font-size:26px;font-weight:700;color:var(--h1)">—</div><div class="dim" id="net-lanes-s" style="font-size:9.5px">traffic index</div></div>
+    <div class="panel" style="padding:12px 14px"><div class="l dim" style="font-size:9.5px;letter-spacing:1px;text-transform:uppercase">Aircraft</div><div class="mono" id="net-air" style="font-size:26px;font-weight:700;color:var(--cyan)">—</div><div class="dim" id="net-air-s" style="font-size:9.5px">live feed</div></div>
+    <div class="panel" style="padding:12px 14px"><div class="l dim" style="font-size:9.5px;letter-spacing:1px;text-transform:uppercase">Ships</div><div class="mono" id="net-ships" style="font-size:26px;font-weight:700;color:var(--cyan)">—</div><div class="dim" id="net-ships-s" style="font-size:9.5px">live feed</div></div>
+  </div>
+  <!-- traffic + reroutes -->
+  <div class="grid">
+    <div class="panel">
+      <h2>TRAFFIC INDEX PER LANE <span class="sub">live congestion model · sync with command center</span> <span class="dot" id="d-net-traffic"></span></h2>
+      <div id="net-traffic-legend" class="dim" style="font-size:10px;margin-bottom:8px;display:flex;gap:10px;flex-wrap:wrap"></div>
+      <div id="net-traffic" class="dim">loading…</div>
+    </div>
+    <div class="panel">
+      <h2>TOTAL REROUTES &amp; DELAYS <span class="sub">read-only from AEGIS source</span> <span class="dot" id="d-net-reroutes"></span></h2>
+      <div id="net-reroutes" class="dim">loading…</div>
+    </div>
+  </div>
+  <!-- predictions + air/ships -->
+  <div class="grid">
+    <div class="panel">
+      <h2>PREDICTIONS · SLA &amp; FUEL RISK <span class="sub">per vehicle · from command center</span> <span class="dot" id="d-net-pred"></span></h2>
+      <div id="net-pred-summary" class="dim" style="font-size:10px;margin-bottom:8px;display:flex;gap:10px;flex-wrap:wrap"></div>
+      <table id="net-pred"><thead><tr><th>Vehicle</th><th>Kind</th><th>Route</th><th>Speed</th><th>Fuel</th><th>ETA</th><th>SLA</th><th>Worst part</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="panel">
+      <h2>LIVE AIR &amp; SHIP TRAFFIC <span class="sub">open-data feeds · sync with command center</span> <span class="dot" id="d-net-live"></span></h2>
+      <div id="net-live" class="dim">loading…</div>
+    </div>
+  </div>
+  <!-- source stats -->
+  <div class="panel" style="margin-top:12px">
+    <h2>SOURCE CENSUS <span class="sub">row counts straight off the AEGIS source</span></h2>
+    <div id="net-stats" class="dim">loading…</div>
+  </div>
+</div>
+
 <!-- ══════════════ TOPOLOGY (layered architecture, live) ══════════════ -->
 <div class="view" id="v-topology">
   <div id="topo-pulse"></div>
   <div class="panel" style="margin-bottom:12px">
-    <h2>SYSTEM ARCHITECTURE <span class="sub">7 layers · numbered data path · live status per component</span> <span class="dot" id="d-topo"></span></h2>
-    <div id="topo-wrap">
-      <svg id="topo-svg" viewBox="0 0 1240 255"></svg>
-      <div id="topo-tt"></div>
-    </div>
+    <h2>SYSTEM ARCHITECTURE <span class="sub">7 stages · each bar = one step · pulsing links show the live data path · hover a bar for details &amp; URL</span> <span class="dot" id="d-topo"></span></h2>
+    <div id="topo-bars"></div>
+    <div id="topo-tt"></div>
     <div id="topo-legend">
-      <span class="lg"><i style="background:var(--cyan)"></i> numbered pipeline steps 1 → 7</span>
-      <span class="lg"><i style="background:var(--green)"></i> lake read path</span>
-      <span class="lg"><i style="background:var(--amber)"></i> live direct read (bypasses pipeline)</span>
-      <span class="lg" style="margin-left:auto">hover a card → details &amp; URL · all statuses probe live every 5s</span>
+      <span class="lg"><i style="background:var(--green)"></i> stage up (live probed)</span>
+      <span class="lg"><i style="background:var(--cyan)"></i> pulsing link = data flowing between stages</span>
+      <span class="lg"><i style="background:var(--amber)"></i> direct read that bypasses the pipeline</span>
+      <span class="lg" style="margin-left:auto">statuses probe live every 5s · hover a bar → details</span>
+    </div>
+    <div class="tpo-bypass">
+      <div class="tpo-by">
+        <div class="h"><span class="bndot"></span> TRINO → SOURCE (federated, read-only)</div>
+        <div class="t">Trino can query the <b>AEGIS source DB directly</b> (Postgres connector) alongside the lake — one SQL engine across both. Used for ad-hoc joins that the pipeline has not yet materialised.</div>
+      </div>
+      <div class="tpo-by">
+        <div class="h"><span class="bndot"></span> INCIDENTS → UI (live, straight from source)</div>
+        <div class="t">Incidents are read <b>live from the source DB</b> (psycopg2) and shown immediately — they do <b>not</b> wait for the pipeline. That keeps the operations view fresh even if the lake is lagging.</div>
+      </div>
     </div>
   </div>
   <div class="grid">
@@ -338,14 +457,9 @@ footer{margin-top:16px;font-size:10px;color:var(--faint);letter-spacing:1px;disp
       <h2>DATAFLOW — COUNTERS (cumulative) <span class="sub">pipeline /metrics</span></h2>
       <div id="topo-counts" class="dim">loading…</div>
       <div class="dim" style="margin-top:10px;font-size:10px;line-height:1.8">
-        <b style="color:var(--txt)">How the data flows:</b><br>
-        ① <b>Source DB</b> (PostGIS, read-only) → ② <b style="color:var(--cyan)">Captor</b> polls every 30s with watermarks →
-        ③ <b style="color:var(--cyan)">Kafka</b> (10 topics × 3 partitions, replayable) →
-        ④ <b style="color:var(--violet)">Pipeline</b> validates data contracts, dedups, writes in 20s micro-batches (atomic delete+insert, quarantine for invalid rows) →
-        ⑤ <b style="color:var(--green)">DuckLake</b> (Postgres metadata <span class="mono">lake-catalog</span> + Parquet on MinIO <span class="mono">s3://aegis-lake/data/</span>) →
-        ⑥ <b style="color:var(--green)">DuckDB</b> (primary reader) / <b>Trino</b> (federated SQL over source + lake) →
-        ⑦ <b style="color:var(--cyan)">Command center UI</b> (this page) + consoles.
-        Incidents are read <b style="color:var(--amber)">live from the source</b> (psycopg2) and bypass the pipeline.
+        <b style="color:var(--txt)">Tip to explain this to a colleague:</b> walk down the bars left-to-right — each bar is one step and the
+        pulsing link below it names <b>what crosses that handoff</b>. The two dashed amber boxes at the bottom are the only paths that
+        <b>bypass</b> the pipeline (Trino federated read + live incidents), which is why the operations view stays fresh even when the lake lags.
       </div>
     </div>
   </div>
@@ -496,6 +610,7 @@ document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
   t.classList.add('on');
   document.getElementById('v-'+t.dataset.v).classList.add('on');
   if (t.dataset.v === 'topology') topo();
+  if (t.dataset.v === 'network') netWork();
   if (t.dataset.v === 'context') ctxTables();
   if (t.dataset.v === 'fleet') fleet();
   if (t.dataset.v === 'supervisor') supervisor();
@@ -614,8 +729,13 @@ async function ctx(key, k){
 }
 
 // ── trends ─────────────────────────────────────────────────────
+function _chartColors(){
+  const light = document.documentElement.getAttribute('data-theme') === 'light';
+  return { tick: light ? '#7d90a9' : '#6f89ad', grid: light ? 'rgba(199,212,230,.6)' : 'rgba(28,51,84,.5)' };
+}
 function mkChart(id, color, data, fill){
   if (charts[id]) charts[id].destroy();
+  const cc = _chartColors();
   charts[id] = new Chart(document.getElementById(id), {
     type:'line',
     data:{labels:data.map(p=>p.ts?new Date(p.ts).toTimeString().slice(0,5):''),
@@ -623,8 +743,8 @@ function mkChart(id, color, data, fill){
             fill:!!fill,tension:.35,pointRadius:0,borderWidth:2}]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y}}},
-      scales:{x:{ticks:{color:'#44608a',font:{size:9}},grid:{color:'rgba(28,51,84,.5)'}},
-              y:{ticks:{color:'#44608a',font:{size:9}},grid:{color:'rgba(28,51,84,.5)'}}}}});
+      scales:{x:{ticks:{color:cc.tick,font:{size:9}},grid:{color:cc.grid}},
+              y:{ticks:{color:cc.tick,font:{size:9}},grid:{color:cc.grid}}}}});
 }
 async function _fetchTrend(metric, bucket){
   const d = await j(`/api/trends/${metric}?bucket=${bucket}&hours=${bucket==='15m'?3:24}`);
@@ -642,6 +762,7 @@ async function trends(){
   }catch(e){ document.getElementById('d-tele').className='dot red'; }
   try{
     const arr = await _fetchTrend('cargo_temp', wins.temp);
+    const cc = _chartColors();
     if (charts['ch-temp']) charts['ch-temp'].destroy();
     charts['ch-temp'] = new Chart(document.getElementById('ch-temp'), {
       type:'line',
@@ -651,8 +772,8 @@ async function trends(){
           {label:'max',data:arr.map(p=>p.max),borderColor:'#fb7185',borderDash:[4,4],tension:.35,pointRadius:0,borderWidth:1.5}]},
       options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:false}},
-        scales:{x:{ticks:{color:'#44608a',font:{size:9}},grid:{color:'rgba(28,51,84,.5)'}},
-                y:{ticks:{color:'#44608a',font:{size:9}},grid:{color:'rgba(28,51,84,.5)'}}}}});
+        scales:{x:{ticks:{color:cc.tick,font:{size:9}},grid:{color:cc.grid}},
+                y:{ticks:{color:cc.tick,font:{size:9}},grid:{color:cc.grid}}}}});
     const last = arr[arr.length-1];
     document.getElementById('val-temp').innerHTML = last ? `${last.value ?? '—'} <small>°C avg</small> · ${last.max ?? '—'} <small>°C max</small>` : '—';
     document.getElementById('sub-temp').textContent = `${arr.length} buckets · ${wins.temp}`;
@@ -772,7 +893,7 @@ function showSpec(i){
   if (!c) return;
   document.getElementById('spec-name').textContent = c.part.part_number + ' · ' + c.component;
   document.getElementById('spec').innerHTML = `
-    <div style="font-size:12px;margin-bottom:8px"><b style="color:#fff">${esc(c.part.name)}</b>
+    <div style="font-size:12px;margin-bottom:8px"><b style="color:var(--h1)">${esc(c.part.name)}</b>
     <span class="pn">${esc(c.part.part_number)}</span><br>
     <span class="dim">supplier: ${esc(c.part.supplier)} · lead time ${c.part.lead_time_days} d · ${fmtEur(c.part.price_eur)} (demo)</span></div>
     <table>${Object.entries(c.part.specs).map(([k,v])=>`<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table>
@@ -839,7 +960,7 @@ async function engShow(id){
     <div style="margin-bottom:8px"><span class="chip ${esc(it.review?.status||'pending')}">${esc(it.review?.status||'pending')}</span>
       <span class="chip">${esc(ex.doc_type||'other')}</span>
       <span class="pn mono">${esc(it.source?.file||'')}</span></div>
-    <div style="font-size:12px;margin-bottom:6px"><b style="color:#fff">${esc(ex.summary||'')}</b></div>
+    <div style="font-size:12px;margin-bottom:6px"><b style="color:var(--h1)">${esc(ex.summary||'')}</b></div>
     ${ex.vehicle_id?`<div class="dim" style="font-size:11px">vehicle: <b>${esc(ex.vehicle_id)}</b></div><br>`:''}
     <table>${(ex.components||[]).map(c=>`<tr>
       <td><b>${esc(c.name)}</b></td><td>${esc(c.finding||'')}</td>
@@ -860,16 +981,41 @@ async function engReview(id, status){
   else alert('review failed: ' + r.status);
 }
 
-// ── TOPOLOGY (layered architecture, live) ──────────────────
-// 7 pipeline stages left→right + direct-read taps from the source.
+// ── TOPOLOGY (stacked stage bars, live) ────────────────────
+// 7 stages top→bottom. Each bar explains what that step does (so you can
+// walk a colleague through it); the pulsing links between bars show the
+// live data path. FLOW labels name what crosses each handoff.
 const STAGES = [
-  {n:1, title:"SOURCE",          sub:"PostGIS · read-only",   ids:["aegis_db"],          port:"host :5433",          url:"postgresql://aegis:5433"},
-  {n:2, title:"CAPTURE",         sub:"Captor poller · 30s",   ids:["captor"],            port:"host :8400",          url:"http://localhost:8400/health"},
-  {n:3, title:"EVENT BUS",       sub:"Kafka · 10 topics",     ids:["kafka"],             port:":9092 · UI :8040",    url:"http://localhost:8040"},
-  {n:4, title:"PROCESS",         sub:"Pipeline · 20s batch",  ids:["pipeline"],          port:"host :8410",          url:"http://localhost:8410/status"},
-  {n:5, title:"DATA LAKE",       sub:"DuckLake v1.0",         ids:["lake_catalog","minio"],port:"catalog :5432 · S3 :9000", url:"http://localhost:9001"},
-  {n:6, title:"QUERY",           sub:"DuckDB + Trino",        ids:["duckdb","trino"],    port:"Trino :8543",         url:"http://localhost:8543"},
-  {n:7, title:"COMMAND CENTER",  sub:"This UI · FastAPI",     ids:["dashboard"],         port:":8402 UI · :8401 API",url:"http://localhost:8402"},
+  {n:1, title:"SOURCE", chip:"PostGIS · read-only", ids:["aegis_db"],
+   desc:"The single source of truth — an <b>AEGIS PostGIS database</b> with shipments, vehicles, telemetry, incidents and lanes. Everything downstream only ever <b>reads</b> it; the pipeline never writes back.",
+   port:"host :5433", url:"postgresql://aegis:5433"},
+  {n:2, title:"CAPTURE", chip:"Captor · poller 30s", ids:["captor"],
+   desc:"A <b>poller</b> watches the source every 30s using watermarks (per-table high-water marks) and emits only the new / changed rows. Idempotent: re-running a poll never duplicates data.",
+   port:"host :8400", url:"http://localhost:8400/health"},
+  {n:3, title:"EVENT BUS", chip:"Kafka · 10 topics", ids:["kafka"],
+   desc:"Captured rows land on <b>Kafka topics</b> (one per table). Kafka is the durable, replayable decoupling layer — consumers can re-read history and the pipeline can lag without losing data.",
+   port:":9092 · UI :8040", url:"http://localhost:8040"},
+  {n:4, title:"PROCESS", chip:"Pipeline · 20s micro-batch", ids:["pipeline"],
+   desc:"The <b>pipeline</b> consumes the topics and, every 20s, validates <b>data contracts</b> (required fields / enums / ranges), <b>dedupes</b>, and writes in one <b>atomic delete + insert</b>. Rows that break a contract go to a <b>quarantine</b> table, never into the lake.",
+   port:"host :8410", url:"http://localhost:8410/status"},
+  {n:5, title:"DATA LAKE", chip:"DuckLake v1.0", ids:["lake_catalog","minio"],
+   desc:"The landing zone: <b>Parquet files</b> on MinIO (S3) with their metadata in Postgres (<span class='mono'>lake-catalog</span>). That separation gives us ACID transactions on the lake plus object-storage scale.",
+   port:"catalog :5432 · S3 :9000", url:"http://localhost:9001"},
+  {n:6, title:"QUERY", chip:"DuckDB + Trino", ids:["duckdb","trino"],
+   desc:"Two read engines over the lake. <b>DuckDB</b> is the fast embedded reader used by the dashboard KPIs; <b>Trino</b> runs federated SQL across the source <i>and</i> the lake in one query for ad-hoc analysis.",
+   port:"Trino :8543", url:"http://localhost:8543"},
+  {n:7, title:"COMMAND CENTER", chip:"this UI · FastAPI", ids:["dashboard"],
+   desc:"The presentation layer you are looking at. The FastAPI app serves the UI and the <b>live KPI / trend / fleet-health</b> endpoints, reading straight off the source for freshness and the lake for history.",
+   port:":8402 UI · :8401 API", url:"http://localhost:8402"},
+];
+// what crosses each handoff between bar i and bar i+1
+const FLOW = [
+  "new / changed rows (watermark-delta)",
+  "published messages (1 topic per table)",
+  "validated, deduped micro-batch (20s)",
+  "Parquet files + metadata (S3)",
+  "SQL reads (DuckDB embedded · Trino federated)",
+  "KPIs, trends & fleet-health (this page)",
 ];
 const TOOLS = [
   {id:"grafana",   title:"Grafana",    sub:"pipeline health", port:":3000",  url:"http://localhost:3000",  role:"Dashboards · admin / Password123!"},
@@ -889,44 +1035,32 @@ function stageStatus(ids){
   return 'warn';
 }
 function topoBuild(){
-  const svg = document.getElementById('topo-svg'); if (!svg) return;
-  const CW=150, CH=100, X0=12, GAP=27, Y=36;
-  const X = i => X0 + i*(CW+GAP);
-  let s = '<defs>'
-    + '<marker id="arrC" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#22d3ee"/></marker>'
-    + '<marker id="arrA" markerWidth="9" markerHeight="9" refX="7" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="#fbbf24"/></marker>'
-    + '</defs>';
-  // stage cards
+  const box = document.getElementById('topo-bars'); if (!box) return;
+  let s = '';
   STAGES.forEach((st, i) => {
-    const x = X(i), y = Y;
-    s += `<g class="tstage" id="ts-${st.n}" data-n="${st.n}">
-      <rect x="${x}" y="${y}" width="${CW}" height="${CH}" rx="10"/>
-      <circle class="tr-circle" cx="${x+18}" cy="${y+19}" r="11"/>
-      <text class="tr-num" x="${x+18}" y="${y+20}" font-size="12">${st.n}</text>
-      <text class="tr-title" x="${x+34}" y="${y+23}" style="font-size:11.5px">${st.title}</text>
-      <text class="tr-sub" x="${x+12}" y="${y+47}">${st.sub}</text>
-      <text class="tcard-port" x="${x+12}" y="${y+66}">${st.port}</text>
-      <text class="tcard-port" x="${x+12}" y="${y+84}">${st.url}</text>
-      <circle class="stat" id="ts-stat-${st.n}" cx="${x+CW-14}" cy="${y+18}" r="5" fill="#6f89ad"/>
-      <text class="tn-lat" id="ts-lat-${st.n}" x="${x+CW-8}" y="${y+CH-8}" text-anchor="end"></text>
-    </g>`;
+    s += `<div class="tpo-stage" id="tpo-${st.n}" data-n="${st.n}">
+      <div class="tpo-num">${st.n}</div>
+      <div>
+        <div class="tpo-title">${st.title}<span class="tpo-chip">${esc(st.chip)}</span></div>
+        <div class="tpo-desc">${st.desc}</div>
+      </div>
+      <div class="tpo-meta">
+        <span class="mono">${esc(st.port)}</span>
+        <a class="tpo-url" href="${esc(st.url)}" target="_blank" rel="noopener">${esc(st.url.replace('http://',''))}</a>
+      </div>
+    </div>`;
     if (i < STAGES.length-1){
-      const ax = x+CW+3, ay = y+CH/2, nx = x+CW+GAP-2;
-      s += `<line id="ts-base-${i}" class="tr-conn" x1="${ax}" y1="${ay}" x2="${nx}" y2="${ay}"/>`;
-      s += `<path id="ts-flow-${i}" class="chev" d="M ${ax} ${ay} L ${nx} ${ay}" marker-end="url(#arrC)"/>`;
+      s += `<div class="tpo-link" id="tpolink-${i}">
+        <div class="tpo-conn"><div class="tpo-line"></div></div>
+        <div class="tpo-linklabel"><b>↓</b> ${esc(FLOW[i])}</div>
+        <div class="tpo-lmeta" id="tpolink-${i}-meta"></div>
+      </div>`;
     }
   });
-  // direct-read taps from the source (query federation + live incidents)
-  const srcX = X(0)+CW/2, qryX = X(5)+CW/2, uiX = X(6)+CW/2;
-  s += `<path id="by1" class="backedge" d="M ${srcX} ${Y+CH} C ${srcX} ${Y+CH+54}, ${qryX} ${Y+CH+54}, ${qryX} ${Y+CH-2}" marker-end="url(#arrA)"/>`;
-  s += `<path id="by2" class="backedge" d="M ${srcX+15} ${Y+CH} C ${srcX+15} ${Y+CH+74}, ${uiX} ${Y+CH+74}, ${uiX} ${Y+CH-2}" marker-end="url(#arrA)"/>`;
-  s += `<text class="tr-step" x="${srcX+6}" y="${Y+CH+16}" style="fill:var(--amber)">direct reads from SOURCE</text>`;
-  s += `<text class="tr-step" x="${(srcX+qryX)/2}" y="${Y+CH+48}" text-anchor="middle">federated read-only (Trino → source)</text>`;
-  s += `<text class="tr-step" x="${(srcX+uiX)/2}" y="${Y+CH+70}" text-anchor="middle">incidents LIVE — straight to UI (psycopg2)</text>`;
-  svg.innerHTML = s;
-  // hover tooltips
-  const tt = document.getElementById('topo-tt'), wrap = document.getElementById('topo-wrap');
-  svg.querySelectorAll('.tstage').forEach(g => {
+  box.innerHTML = s;
+  // hover tooltip (live detail per component)
+  const tt = document.getElementById('topo-tt');
+  box.querySelectorAll('.tpo-stage').forEach(g => {
     const st = STAGES.find(x => x.n == g.dataset.n);
     g.addEventListener('mousemove', ev => {
       const detail = st.ids.map(id => {
@@ -934,53 +1068,49 @@ function topoBuild(){
         return `<div class="tt-row"><span class="dim">${id}</span><span>${esc(n.status||'—')}${n.latency_ms!=null?' · '+n.latency_ms+'ms':''}${n.detail?'<br><span class="dim">'+esc(n.detail)+'</span>':''}</span></div>`;
       }).join('');
       tt.innerHTML = `<b>${st.title}</b> <span class="dim">· step ${st.n}</span><br>${detail}
-        <div class="tt-row"><span style="color:var(--faint)">URL</span><span class="mono">${st.url}</span></div>`;
+        <div class="tt-row"><span style="color:var(--faint)">URL</span><span class="mono">${esc(st.url)}</span></div>`;
       tt.style.display='block';
-      const wr = wrap.getBoundingClientRect(), tr = tt.getBoundingClientRect();
+      const wr = box.closest('.panel').getBoundingClientRect(), tr = tt.getBoundingClientRect();
       let L = ev.clientX - wr.left + 16, T = ev.clientY - wr.top + 14;
       if (L + tr.width > wr.width - 8) L = ev.clientX - wr.left - tr.width - 14;
       if (T + tr.height > wr.height - 4) T = Math.max(4, ev.clientY - wr.top - tr.height - 12);
       tt.style.left = L+'px'; tt.style.top = T+'px';
-      svg.querySelectorAll('.tstage').forEach(x => x.classList.remove('hl'));
+      box.querySelectorAll('.tpo-stage').forEach(x => x.classList.remove('hl'));
       g.classList.add('hl');
     });
     g.addEventListener('mouseleave', () => { tt.style.display='none';
-      svg.querySelectorAll('.tstage').forEach(x => x.classList.remove('hl')); });
+      box.querySelectorAll('.tpo-stage').forEach(x => x.classList.remove('hl')); });
   });
   _topoBuilt = true;
 }
 function topoUpdate(){
   const d = window._topo; if (!d || !d.nodes) return;
   const tNow = Date.now(); const dt = Math.max(1, (tNow - _topoT0)/1000); _topoT0 = tNow;
-  const pi = (d.pipeline||{}).records_in_total || {}, pw = (d.pipeline||{}).records_written_total || {};
+  const pi = (d.pipeline||{}).records_in_total || {};
   const totIn = Object.values(pi).reduce((a,b)=>a+(b||0),0);
-  if (_topoPrev.t !== tNow){
-    if (_topoPrev.totIn != null) _topoRates.kafka = Math.max(0, (_topoPrev.totIn - totIn)/dt);
-    _topoPrev = {totIn, t: tNow};
-  }
+  // per-stage status
   STAGES.forEach(st => {
     const stt = stageStatus(st.ids);
-    const el = document.getElementById('ts-stat-'+st.n);
-    if (el) el.setAttribute('fill', stt==='up'?'var(--green)':(stt==='down'?'var(--rose)':'var(--amber)'));
-    const lat = document.getElementById('ts-lat-'+st.n);
-    if (lat){
-      const first = (d.nodes[st.ids[0]]||{});
-      lat.textContent = stt==='up' ? (first.latency_ms!=null?first.latency_ms+' ms':'up') : (stt==='down'?'down':'partial');
-    }
+    const el = document.getElementById('tpo-'+st.n);
+    if (!el) return;
+    el.classList.remove('is-up','is-warn','is-down');
+    el.classList.add('is-'+stt);
   });
-  // chevrons: light up the segment when both adjacent stages are up
+  // pulsing links: flow (cyan) only while both neighbours are up; dead (red) otherwise
   for (let i=0;i<STAGES.length-1;i++){
     const a=stageStatus(STAGES[i].ids), b=stageStatus(STAGES[i+1].ids);
     const alive = a==='up' && b==='up';
-    const f=document.getElementById('ts-flow-'+i), base=document.getElementById('ts-base-'+i);
-    if (f) f.style.display = alive?'':'none';
-    if (base) base.style.opacity = alive?1:.4;
+    const ln=document.getElementById('tpolink-'+i);
+    if (ln) ln.classList.toggle('dead', !alive);
+    // rate badge on the link into the lake (records/s) for the process→lake hop
+    if (i===3){
+      const m=document.getElementById('tpolink-'+i+'-meta');
+      if (m) m.textContent = _topoRates.perS ? '≈ '+Math.round(_topoRates.perS).toLocaleString('nl-NL')+' rec/s' : '';
+    }
   }
-  // direct-read taps visible when source is up
-  const srcUp = stageStatus(['aegis_db'])==='up';
-  const by1=document.getElementById('by1'), by2=document.getElementById('by2');
-  if (by1) by1.style.opacity = srcUp?.6:.15;
-  if (by2) by2.style.opacity = (srcUp && stageStatus(['dashboard'])==='up')?.6:.15;
+  // throughput: track total-in delta to derive rec/s
+  if (_topoPrev.totIn != null) _topoRates.perS = Math.max(0, (totIn - _topoPrev.totIn)/dt);
+  _topoPrev = {totIn, t: tNow};
   // pulse badges
   const down = STAGES.filter(st=>stageStatus(st.ids)==='down').length;
   const allUp = down===0;
@@ -988,7 +1118,8 @@ function topoUpdate(){
     `<div class="badge ${allUp?'live':'red'}">ARCHITECTURE <b>${allUp?'ALL STAGES UP':down+' DOWN'}</b></div>
      <div class="badge">AS-OF <b>${new Date(d.ts).toTimeString().slice(0,8)} UTC</b></div>
      <div class="badge">PIPELINE <b>${totIn?totIn.toLocaleString('nl-NL')+' in':'—'}</b></div>`;
-  document.getElementById('d-topo').className = 'dot '+(allUp?'green':'red');
+  const dot = document.getElementById('d-topo');
+  if (dot) dot.className = 'dot '+(allUp?'green':'red');
   // tools table
   const tb = document.querySelector('#topo-tools tbody');
   if (tb){
@@ -1019,6 +1150,172 @@ document.querySelector('.tab[data-v="topology"]')?.addEventListener('click', () 
     if (on){ try { window._topo = await j('/api/topology'); topoUpdate(); } catch(e) {} }
     else { clearInterval(_topoTimer); _topoTimer = null; }
   }, 5000);
+});
+
+// ── NETWORK · LIVE (traffic, reroutes, predictions, air/ships) ──
+// All of this is synced with the operational command center (:8300): the
+// proxy endpoints below read the same feeds the command center uses, so the
+// numbers on this tab match what the operations crew sees.
+const NET_STATE = {};
+const _netDot = (id, live) => { const d = document.getElementById(id); if (d) d.className = 'dot ' + (live ? 'green' : 'red'); };
+const _slaCls = r => r === 'on_time' ? 'ok' : r === 'at_risk' ? 'warning' : 'critical';
+const _fmtK = v => v >= 1e9 ? (v / 1e9).toFixed(2) + 'B€' : v >= 1e6 ? (v / 1e6).toFixed(1) + 'M€' : v >= 1e3 ? (v / 1e3).toFixed(0) + 'k€' : (v || 0) + '€';
+
+async function netWork(){
+  try { await netRefresh(); } catch(e) {}
+}
+async function netRefresh(){
+  const [traffic, reroutes, pred, air, ships, stats] = await Promise.all([
+    j('/api/network/traffic').catch(()=>({})),
+    j('/api/network/reroutes').catch(()=>({})),
+    j('/api/network/predictions').catch(()=>({})),
+    j('/api/network/air').catch(()=>({})),
+    j('/api/network/ships').catch(()=>({})),
+    j('/api/network/stats').catch(()=>({})),
+  ]);
+  netRender(traffic, reroutes, pred, air, ships, stats);
+}
+function netRender(traffic, reroutes, pred, air, ships, stats){
+  const ts = Date.now();
+  // summary cards
+  const byStatus = reroutes.by_status || {};
+  const active = byStatus.in_transit ?? 0;
+  const rerouted = reroutes.total_reroutes ?? 0;
+  const delayed = byStatus.delayed ?? 0;
+  const totalShips = Object.values(byStatus).reduce((a,b)=>a+b,0) || active + rerouted + delayed || 1;
+  document.getElementById('net-ship').textContent = active.toLocaleString('nl-NL');
+  document.getElementById('net-ship-s').textContent = (stats.shipments||'—') + ' total in source';
+  document.getElementById('net-reroute').textContent = rerouted.toLocaleString('nl-NL');
+  document.getElementById('net-reroute-s').textContent = Math.round((rerouted/totalShips)*100) + '% of all shipments';
+  document.getElementById('net-delay').textContent = (rerouted + delayed).toLocaleString('nl-NL');
+  document.getElementById('net-delay-s').textContent = delayed + ' delayed + ' + rerouted + ' rerouted';
+  const lanes = traffic.lanes || [];
+  const jammed = lanes.filter(l=>l.state==='jammed').length, busy = lanes.filter(l=>l.state==='busy').length;
+  document.getElementById('net-lanes').textContent = lanes.length.toLocaleString('nl-NL');
+  document.getElementById('net-lanes-s').textContent = busy + ' busy · ' + jammed + ' jammed';
+  document.getElementById('net-air').textContent = (air.count ?? 0).toLocaleString('nl-NL');
+  document.getElementById('net-air-s').textContent = (air.state||air.source||'—') + ' feed';
+  document.getElementById('net-ships').textContent = (ships.count ?? 0).toLocaleString('nl-NL');
+  document.getElementById('net-ships-s').textContent = (ships.state||ships.source||'—') + ' feed';
+  _netDot('d-net-traffic', !traffic.error);
+  _netDot('d-net-reroutes', !!reroutes.live);
+  _netDot('d-net-pred', !pred.error);
+  _netDot('d-net-live', !air.error && !ships.error);
+
+  // traffic index bar per lane
+  const tl = document.getElementById('net-traffic');
+  if (traffic.error || !lanes.length){
+    tl.innerHTML = '<span class="dim">traffic feed unreachable: ' + esc(traffic.error||'') + '</span>';
+  } else {
+    const counts = {}; lanes.forEach(l=>counts[l.state]=(counts[l.state]||0)+1);
+    document.getElementById('net-traffic-legend').innerHTML =
+      ['free','moderate','busy','jammed'].map(s =>
+        `<span><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${s==='free'?'var(--green)':s==='moderate'?'#a3e635':s==='busy'?'var(--amber)':'var(--rose)'};margin-right:5px"></i>${s} ${counts[s]||0}</span>`).join('');
+    tl.innerHTML = lanes.sort((a,b)=>b.index-a.index).map(l => {
+      const w = Math.round(l.index*100);
+      const col = l.state==='free'?'var(--green)':l.state==='moderate'?'#a3e635':l.state==='busy'?'var(--amber)':'var(--rose)';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:2.5px 0;border-bottom:1px dashed rgba(28,51,84,.5)">
+        <span class="mono" style="font-size:9.5px;width:52px;color:var(--dim)">${esc(l.lane_id)}</span>
+        <div style="flex:1;height:9px;background:rgba(20,40,70,.6);border-radius:5px;overflow:hidden">
+          <div style="width:${w}%;height:100%;background:${col};border-radius:5px;transition:width .6s"></div>
+        </div>
+        <span class="mono" style="font-size:9px;width:34px;text-align:right;color:var(--dim)">${l.index.toFixed(2)}</span>
+        <span style="font-size:9px;width:62px;text-align:right;color:${col}">×${l.est_factor.toFixed(2)}</span>
+      </div>`;
+    }).join('');
+  }
+
+  // reroutes + delays table
+  const rr = document.getElementById('net-reroutes');
+  if (reroutes.error){
+    rr.innerHTML = '<span class="dim">source unreachable: ' + esc(reroutes.error) + '</span>';
+  } else {
+    const rows = (reroutes.items||[]);
+    rr.innerHTML = `<div class="dim" style="font-size:10px;margin-bottom:8px">
+        <b style="color:var(--txt)">by status:</b> ${Object.entries(byStatus).map(([k,v])=>`<span style="margin-right:10px">${esc(k)} <span class="mono" style="color:var(--cyan)">${v}</span></span>`).join('') || '—'}
+      </div>
+      <table><thead><tr><th>Shipment</th><th>Vehicle</th><th>Status</th><th>Route</th><th>Value</th></tr></thead><tbody>
+      ${rows.map(r=>`<tr>
+        <td class="mono" style="font-size:9.5px">${esc(r.id)}</td>
+        <td class="mono" style="font-size:9.5px">${esc(r.vehicle_id||'—')}</td>
+        <td><span class="sev ${r.status==='rerouted'?'warning':'critical'}">${esc(r.status)}</span></td>
+        <td style="font-size:10px;color:var(--dim)">${esc(r.origin||'—')} → ${esc(r.destination||'—')}</td>
+        <td class="mono" style="font-size:10px">${r.k_eur!=null?r.k_eur+'k€':'—'}</td>
+      </tr>`).join('') || '<tr><td colspan="5" class="dim">no rerouted / delayed shipments</td></tr>'}
+      </tbody></table>`;
+  }
+
+  // predictions
+  const units = pred.units || [];
+  const slaC = {}; units.forEach(u=>slaC[u.sla_risk]=(slaC[u.sla_risk]||0)+1);
+  document.getElementById('net-pred-summary').innerHTML =
+    Object.entries(slaC).map(([k,v])=>`<span class="chip ${_slaCls(k)}">${esc(k)} ${v}</span>`).join('') +
+    `<span class="dim" style="margin-left:auto">${units.length} vehicles</span>`;
+  const tb = document.querySelector('#net-pred tbody');
+  if (tb) tb.innerHTML = units.sort((a,b)=> (a.sla_risk==='breach_risk'?0:1)-(b.sla_risk==='breach_risk'?0:1) || a.health_score-b.health_score).slice(0,18).map(u=>`<tr>
+      <td class="mono" style="font-size:9.5px"><b>${esc(u.id)}</b></td>
+      <td style="font-size:9.5px">${esc(u.kind)}</td>
+      <td style="font-size:9.5px;color:var(--dim)">${esc(u.from)}→${esc(u.to)}</td>
+      <td class="mono" style="font-size:9.5px">${u.speed!=null?u.speed.toFixed(0)+'km/h':'—'}</td>
+      <td class="mono" style="font-size:9.5px">${u.fuel_pct!=null?u.fuel_pct.toFixed(0)+'%':'—'}</td>
+      <td class="mono" style="font-size:9.5px">${u.eta_min!=null?u.eta_min+'m':'—'}</td>
+      <td><span class="sev ${_slaCls(u.sla_risk)}">${esc(u.sla_risk)}</span></td>
+      <td style="font-size:9.5px;color:var(--dim)">${esc(u.worst_part||'—')}</td>
+    </tr>`).join('') || '<tr><td colspan="8" class="dim">no predictions</td></tr>';
+
+  // live air & ships
+  const av = document.getElementById('net-live');
+  if (air.error && ships.error){
+    av.innerHTML = '<span class="dim">live feeds unreachable</span>';
+  } else {
+    const a = (air.aircraft||[]).slice(0,6), sh = (ships.ships||[]).slice(0,6);
+    av.innerHTML = `
+      <div class="dim" style="font-size:10px;margin-bottom:6px"><b style="color:var(--cyan)">✈ aircraft</b> — top ${a.length} of ${air.count ?? (air.aircraft||[]).length} in view</div>
+      <table><thead><tr><th>Callsign</th><th>Country</th><th>Alt</th><th>Vel</th><th>Track</th></tr></thead><tbody>
+      ${a.map(x=>`<tr><td class="mono" style="font-size:9.5px">${esc(x.callsign)}</td><td style="font-size:9.5px;color:var(--dim)">${esc(x.country)}</td>
+        <td class="mono" style="font-size:9.5px">${x.alt!=null?Math.round(x.alt)+'m':'—'}</td>
+        <td class="mono" style="font-size:9.5px">${x.vel!=null?Math.round(x.vel)+'kt':'—'}</td>
+        <td class="mono" style="font-size:9.5px">${x.track!=null?Math.round(x.track)+'°':'—'}</td></tr>`).join('') || '<tr><td colspan="5" class="dim">—</td></tr>'}
+      </tbody></table>
+      <div class="dim" style="font-size:10px;margin:10px 0 6px"><b style="color:var(--cyan)">⚓ ships</b> — top ${sh.length} of ${ships.count ?? (ships.ships||[]).length} in view</div>
+      <table><thead><tr><th>Name</th><th>Type</th><th>Speed</th><th>Dest</th><th>Zone</th></tr></thead><tbody>
+      ${sh.map(x=>`<tr><td class="mono" style="font-size:9.5px">${esc(x.name)}</td><td style="font-size:9.5px;color:var(--dim)">${esc(x.type||'—')}</td>
+        <td class="mono" style="font-size:9.5px">${x.speed!=null?x.speed.toFixed(1)+'kn':'—'}</td>
+        <td class="mono" style="font-size:9.5px">${esc(x.dest||'—')}</td>
+        <td style="font-size:9.5px;color:var(--dim)">${esc((x.zone||'').replace('_',' '))}</td></tr>`).join('') || '<tr><td colspan="5" class="dim">—</td></tr>'}
+      </tbody></table>`;
+  }
+
+  // source census
+  const sc = document.getElementById('net-stats');
+  if (stats && stats.tables != null){
+    const kv = [['locations','Locations'],['lanes_total','Lanes'],['vehicles','Vehicles'],['drivers','Drivers'],
+                ['shipments','Shipments'],['events','Shipment events'],['telemetry','Telemetry records'],
+                ['incidents_total','Incidents (total)'],['components','Components'],['routes_cached','Routes cached']];
+    sc.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px">
+      ${kv.map(([k,l])=>`<div style="border:1px solid var(--line);border-radius:7px;padding:8px 10px">
+        <div class="dim" style="font-size:9px;letter-spacing:.6px;text-transform:uppercase">${esc(l)}</div>
+        <div class="mono" style="font-size:19px;font-weight:700;color:var(--h1);margin-top:2px">${(stats[k]??'—').toLocaleString?.('nl-NL') ?? '—'}</div>
+      </div>`).join('')}
+    </div>`;
+  } else {
+    sc.innerHTML = '<span class="dim">source census unavailable</span>';
+  }
+
+  // pulse badge
+  document.getElementById('net-pulse').innerHTML =
+    `<div class="badge live">NETWORK <b>SYNCED WITH COMMAND CENTER</b></div>
+     <div class="badge">AS-OF <b>${new Date(ts).toTimeString().slice(0,8)} UTC</b></div>
+     <div class="badge">SOURCE <b>aegis :8300 + aegis_db</b></div>`;
+}
+let _netTimer = null;
+document.querySelector('.tab[data-v="network"]')?.addEventListener('click', () => {
+  if (_netTimer) return;
+  _netTimer = setInterval(async () => {
+    const on = document.querySelector('.tab.on')?.dataset.v === 'network';
+    if (on){ try { await netRefresh(); } catch(e) {} }
+    else { clearInterval(_netTimer); _netTimer = null; }
+  }, 20000);
 });
 
 // ── DATA CONTEXT (all tables: source → topic → lake) ────────
@@ -1104,6 +1401,26 @@ async function refresh(){
         document.getElementById('t-eng-n').textContent = d.items.filter(i=>i.status==='pending').length || ''; } catch(e){}
 }
 refresh();
+// ── THEME TOGGLE (light / dark, preference in localStorage) ──
+const _themeBtn = document.getElementById('themeToggle');
+const _themeIco = document.getElementById('themeIco');
+function _themeLabel(){
+  const t = document.documentElement.getAttribute('data-theme');
+  _themeIco.textContent = t === 'light' ? '☾ DARK' : '☀ LIGHT';
+  _themeIco.title = t === 'light' ? 'Switch to dark mode' : 'Switch to light mode';
+}
+if (_themeBtn){
+  _themeBtn.addEventListener('click', () => {
+    const t = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', t);
+    try { localStorage.setItem('aegis-theme', t); } catch(e){}
+    _themeLabel();
+    // re-render charts (Chart.js colors are fixed at creation)
+    if (document.querySelector('.tab.on')?.dataset.v === 'ops') trends().catch(() => {});
+  });
+  _themeLabel();
+}
+
 setInterval(refresh, 30000);
 </script>
 </body>

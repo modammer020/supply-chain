@@ -1,6 +1,0 @@
-FROM busybox:latest
-COPY minio /usr/local/bin/minio
-EXPOSE 9000 9001
-HEALTHCHECK --interval=10s --timeout=5s --retries=12 --start-period=15s \
-  CMD wget -q -O- http://localhost:9000/minio/health/ready >/dev/null 2>&1 || exit 1
-ENTRYPOINT ["/usr/local/bin/minio"]

@@ -30,7 +30,14 @@ with open(SEM_PATH) as f:
     SEMANTICS = yaml.safe_load(f)
 
 # ── DuckDB (embedded → DuckLake) ──────────────────────────────
-_lock = threading.Lock()
+# One DuckDB connection PER WORKER THREAD (thread-local).  DuckDB connections
+# are not thread-safe — sharing one connection across the uvicorn threadpool
+# caused C++ aborts ("terminate called without an active exception").  The
+# per-thread connection is created once (extensions load from the prebuilt
+# ~/.duckdb/extensions cache, ATTACH ~0.1 s) and refreshed after 60 s so new
+# DuckLake snapshots are picked up.
+_thread_local = threading.local()
+_TTL_S = 60
 
 
 def _duck():
@@ -48,19 +55,25 @@ def _duck():
     return con
 
 
-_duck_cached = {"con": None, "t": 0}
-
-
 def duck():
-    with _lock:
-        if _duck_cached["con"] is None or time.time() - _duck_cached["t"] > 30:
-            try:
-                _duck_cached["con"].close()
-            except Exception:
-                pass
-            _duck_cached["con"] = _duck()
-            _duck_cached["t"] = time.time()
-        return _duck_cached["con"]
+    """Per-thread DuckDB connection (safe: never shared across threads)."""
+    con = getattr(_thread_local, "con", None)
+    if con is None or time.time() - getattr(_thread_local, "t", 0) > _TTL_S:
+        try:
+            if con:
+                con.close()
+        except Exception:
+            pass
+        try:
+            con = _duck()
+            _thread_local.con = con
+            _thread_local.t = time.time()
+        except Exception:
+            # broken/lost connection → retry once with a fresh one
+            con = _duck()
+            _thread_local.con = con
+            _thread_local.t = time.time()
+    return con
 
 
 def _aegis():
@@ -102,38 +115,45 @@ def _contract_status(source_table: str):
 
 
 def _age_seconds():
+    """Data age (s) — live right off the AEGIS source (read-only)."""
     try:
-        con = duck()
-        r = con.execute(
-            "SELECT max(captured_at) FROM facts.telemetry").fetchone()[0]
-        if r:
-            if r.tzinfo is None:  # DuckDB kan naive teruggeven
-                r = r.replace(tzinfo=timezone.utc)
-            return int((datetime.now(timezone.utc) - r).total_seconds())
-        return 0
+        with _aegis() as c, c.cursor() as cur:
+            cur.execute("SELECT max(ts) FROM telemetry")
+            r = cur.fetchone()[0]
+            if r:
+                if r.tzinfo is None:  # DuckDB kan naive teruggeven
+                    r = r.replace(tzinfo=timezone.utc)
+                return int((datetime.now(timezone.utc) - r).total_seconds())
+            return 0
     except Exception:
         return 99999
 
 
-# KPI-definities → lake-query
-def _kpi_query(key: str):
+# KPI-queries: live rechtstreeks op de AEGIS-bron (read-only, psycopg2).
+# Zelfde bron + queries als de operationele command center (aegis, :8300) →
+# perfect in sync.  De DuckLake wordt nog steeds gebruikt voor trends /
+# data-engineer / topology, maar de 16 KPI's lezen de ground truth direct —
+# zo vermijden we de 10k-bestanden-scan op de lake en zijn de waarden exact
+# wat de command center toont.
+def _kpi_source_query(key: str):
+    """(psycopg2 SQL, source_table) right off the AEGIS source."""
     M = {
-        "otif_pct": ("SELECT round(avg(otif_pct),1) FROM dims.lanes", "lanes"),
-        "value_in_transit": ("SELECT coalesce(sum(value_eur),0) FROM dims.shipments WHERE status='in_transit'", "shipments"),
-        "active_shipments": ("SELECT count(*) FROM dims.shipments WHERE status='in_transit'", "shipments"),
-        "delayed": ("SELECT count(*) FROM dims.shipments WHERE status IN ('delayed','rerouted')", "shipments"),
+        "otif_pct": ("SELECT round(avg(otif_pct),1) FROM lanes", "lanes"),
+        "value_in_transit": ("SELECT coalesce(sum(value_eur),0) FROM shipments WHERE status='in_transit'", "shipments"),
+        "active_shipments": ("SELECT count(*) FROM shipments WHERE status='in_transit'", "shipments"),
+        "delayed": ("SELECT count(*) FROM shipments WHERE status IN ('delayed','rerouted')", "shipments"),
         "incidents": ("SELECT count(*) FROM incidents WHERE resolved_at IS NULL", "incidents"),
         "incidents_p1": ("SELECT count(*) FROM incidents WHERE resolved_at IS NULL AND severity='P1'", "incidents"),
-        "carbon_tco2": ("SELECT round(sum(carbon_tco2),2) FROM dims.vehicles", "vehicles"),
-        "low_stock_skus": ("SELECT count(*) FROM dims.inventory WHERE stock<reorder", "inventory"),
-        "weekly_demand_units": ("SELECT coalesce(sum(velocity),0) FROM dims.inventory", "inventory"),
-        "units": ("SELECT count(*) FROM dims.vehicles", "vehicles"),
-        "fleet_fuel_avg": ("SELECT round(avg(fuel_pct),1) FROM dims.vehicles WHERE fuel_pct IS NOT NULL", "vehicles"),
-        "fleet_speed_avg": ("SELECT round(avg(speed_kmh),1) FROM facts.telemetry WHERE speed_kmh > 0 AND ts > now() - interval '24 hour'", "telemetry"),
-        "live_vehicles_10m": ("SELECT count(DISTINCT vehicle_id) FROM facts.telemetry WHERE ts > now() - interval '10 minutes'", "telemetry"),
-        "cargo_temp": ("SELECT round(avg(cargo_temp),1) FROM facts.telemetry", "telemetry"),
-        "telemetry_count": ("SELECT count(*) FROM facts.telemetry", "telemetry"),
-        "shipment_status": ("SELECT count(*) FROM dims.shipments", "shipments"),
+        "carbon_tco2": ("SELECT round(sum(carbon_tco2)::numeric,2) FROM vehicles", "vehicles"),
+        "low_stock_skus": ("SELECT count(*) FROM inventory WHERE stock<reorder", "inventory"),
+        "weekly_demand_units": ("SELECT coalesce(sum(velocity),0) FROM inventory", "inventory"),
+        "units": ("SELECT count(*) FROM vehicles", "vehicles"),
+        "fleet_fuel_avg": ("SELECT round(avg(fuel_pct)::numeric,1) FROM vehicles WHERE fuel_pct IS NOT NULL", "vehicles"),
+        "fleet_speed_avg": ("SELECT round(avg(speed_kmh)::numeric,1) FROM telemetry WHERE speed_kmh>0 AND ts>now()-interval '24 hour'", "telemetry"),
+        "live_vehicles_10m": ("SELECT count(DISTINCT vehicle_id) FROM telemetry WHERE ts>now()-interval '10 minutes'", "telemetry"),
+        "cargo_temp": ("SELECT round(avg(cargo_temp)::numeric,1) FROM telemetry", "telemetry"),
+        "telemetry_count": ("SELECT count(*) FROM telemetry", "telemetry"),
+        "shipment_status": ("SELECT count(*) FROM shipments", "shipments"),
     }
     return M.get(key)
 
@@ -147,7 +167,7 @@ def get_kpis():
     out = []
     age = _age_seconds()
     for key, sem in SEMANTICS.items():
-        qs = _kpi_query(key)
+        qs = _kpi_source_query(key)
         if qs is None:
             q, src = (None, sem.get("source_table"))
         else:
@@ -155,15 +175,11 @@ def get_kpis():
         value = None
         live = False
         try:
-            if src == "incidents":
-                # live rechtstreeks op de AEGIS-bron (read-only)
-                with _aegis() as c, c.cursor() as cur:
-                    cur.execute(q)
-                    value = cur.fetchone()[0]
-                live = True
-            else:
-                con = duck()
-                value = con.execute(q).fetchone()[0]
+            # Alles direct op de AEGIS-bron (read-only) — in sync met CC.
+            with _aegis() as c, c.cursor() as cur:
+                cur.execute(q)
+                value = cur.fetchone()[0]
+            live = True
             out.append({
                 "key": key, "value": float(value) if value is not None else None,
                 "label": sem.get("label", key), "unit": sem.get("unit", ""),
@@ -187,52 +203,52 @@ def get_kpis():
 
 
 # ── trends ─────────────────────────────────────────────────────
+# ── trends (live off the AEGIS source — in sync with CC) ───────
+# Postgres has no time_bucket(); we bucket on epoch seconds with floor
+# division, which gives identical bucket edges.
 def get_trend(metric: str, bucket: str = "1h", hours: int = 24):
-    con = duck()
-    B = {"5m": "5 minutes", "15m": "15 minutes", "1h": "1 hour", "1d": "1 day"}
-    b = B.get(bucket, "1 hour")
-    H = str(hours)
-    qmap = {
-        "otif": ("SELECT time_bucket(?, ts) t, round(avg(otif_pct),1) v FROM "
-                 "SELECT ts, otif_pct FROM dims.lanes GROUP BY 1 ORDER BY 1", [b]),
-        "telemetry_count": ("SELECT time_bucket(?, ts) t, count(*) v FROM "
-                            "facts.telemetry WHERE ts > now() - (? || ' hours')::interval "
-                            "GROUP BY 1 ORDER BY 1", [b, H]),
-        "cargo_temp": ("SELECT time_bucket(?, ts) t, round(avg(cargo_temp),2) v, "
-                       "max(cargo_temp) mx FROM facts.telemetry "
-                       "WHERE ts > now() - (? || ' hours')::interval GROUP BY 1 ORDER BY 1",
-                       [b, H]),
-        "value_in_transit": ("SELECT time_bucket(?, ts) t, round(sum(value_eur),0) v FROM "
-                             "facts.shipment_events WHERE type='status' GROUP BY 1 ORDER BY 1", [b]),
-        "shipment_status": ("SELECT time_bucket(?, cycle_ts) t, status, count(*) v FROM "
-                            "dims.shipments GROUP BY 1,2 ORDER BY 1", [b]),
-        "fleet_speed": ("SELECT time_bucket(?, ts) t, round(avg(speed_kmh),1) v FROM "
-                        "facts.telemetry WHERE speed_kmh > 0 "
-                        "AND ts > now() - (? || ' hours')::interval GROUP BY 1 ORDER BY 1", [b, H]),
-        "live_vehicles": ("SELECT time_bucket(?, ts) t, count(DISTINCT vehicle_id) v FROM "
-                          "facts.telemetry WHERE ts > now() - (? || ' hours')::interval "
-                          "GROUP BY 1 ORDER BY 1", [b, H]),
+    S = {
+        "5m": 300, "15m": 900, "1h": 3600, "1d": 86400,
     }
-    if metric not in qmap:
+    b = S.get(bucket, 3600)
+    H = min(int(hours or 24), 168)
+    if metric == "telemetry_count":
+        q = ("SELECT (EXTRACT(EPOCH FROM ts)::bigint / %s)::bigint * %s AS bucket, count(*) AS v "
+             "FROM telemetry WHERE ts > now() - (%s || ' hours')::interval "
+             "GROUP BY 1 ORDER BY 1")
+        cols = ["telemetry"]
+    elif metric == "cargo_temp":
+        q = ("SELECT (EXTRACT(EPOCH FROM ts)::bigint / %s)::bigint * %s AS bucket, "
+             "round(avg(cargo_temp)::numeric,2) AS v, max(cargo_temp) AS mx "
+             "FROM telemetry WHERE ts > now() - (%s || ' hours')::interval "
+             "GROUP BY 1 ORDER BY 1")
+        cols = ["telemetry"]
+    elif metric == "fleet_speed":
+        q = ("SELECT (EXTRACT(EPOCH FROM ts)::bigint / %s)::bigint * %s AS bucket, "
+             "round(avg(speed_kmh)::numeric,1) AS v "
+             "FROM telemetry WHERE speed_kmh > 0 "
+             "AND ts > now() - (%s || ' hours')::interval GROUP BY 1 ORDER BY 1")
+        cols = ["telemetry"]
+    elif metric == "live_vehicles":
+        q = ("SELECT (EXTRACT(EPOCH FROM ts)::bigint / %s)::bigint * %s AS bucket, "
+             "count(DISTINCT vehicle_id) AS v "
+             "FROM telemetry WHERE ts > now() - (%s || ' hours')::interval "
+             "GROUP BY 1 ORDER BY 1")
+        cols = ["telemetry"]
+    else:
         return {"series": []}
-    q, params = qmap[metric]
     try:
-        if metric == "shipment_status":
-            cur = con.execute(q, params)
+        with _aegis() as c, c.cursor() as cur:
+            cur.execute(q, (b, b, str(H)))
             rows = cur.fetchall()
-            series = {}
-            for t, status, v in rows:
-                series.setdefault(status, []).append(
-                    {"ts": t.isoformat(), "value": int(v)})
-            return {"series": series}
         if metric == "cargo_temp":
-            cur = con.execute(q, params)
-            return {"series": [{"ts": t.isoformat(), "value": float(v) if v else None,
-                                "max": float(mx) if mx else None}
-                               for t, v, mx in cur.fetchall()]}
-        cur = con.execute(q, params)
-        return {"series": [{"ts": t.isoformat(), "value": float(v) if v is not None else None}
-                           for t, v in cur.fetchall()]}
+            return {"series": [{"ts": datetime.fromtimestamp(int(r[0]), tz=timezone.utc).isoformat(),
+                                "value": float(r[1]) if r[1] is not None else None,
+                                "max": float(r[2]) if r[2] is not None else None}
+                               for r in rows]}
+        return {"series": [{"ts": datetime.fromtimestamp(int(r[0]), tz=timezone.utc).isoformat(),
+                            "value": float(r[1]) if r[1] is not None else None}
+                           for r in rows]}
     except Exception as e:  # noqa
         return {"series": [], "error": str(e)[:120]}
 

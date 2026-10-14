@@ -33,7 +33,7 @@ def _match_part(name: str):
 
 
 def part_for(component: dict) -> dict:
-    p = _match_part(component["name"])
+    p = _match_part(component.get("name") or component.get("component") or "")
     return {
         "part_number": p["part_number"], "name": p["name"],
         "supplier": p["supplier"], "lead_time_days": p["lead_time_days"],
